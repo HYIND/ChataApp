@@ -1,0 +1,70 @@
+客户端和服务器消息的交互，遵循以下json格式：
+{
+  "command": number
+}
+
+1、登录:
+{
+    "command":1000,
+    "name":string
+}
+返回:
+{
+    "command":2000,
+    token:string,
+    name:string,
+    ip:string,
+    port:number
+}
+
+2、拉取在线用户:
+{
+    "command": 1001
+    "token":string
+}
+返回：
+{
+    "command": 2001,
+    users:[
+        {
+            token:string,
+            name:string,
+            ip:string,
+            port:number
+        },
+        {
+            token:string,
+            name:string,
+            ip:string,
+            port:number
+        },
+        ......
+    ]
+}
+
+3、客户端请求发送消息:
+{
+    "command": 1002,
+    "token":"string",
+    "goaltoken":"string",
+    "type":number
+    "msg":string
+}
+返回
+{
+    "command": 2002,
+    "result":bool
+}
+
+4、服务器分发用户发送的消息：
+{
+    "command":2003,
+    "srctoken":string,
+    "goaltoken":string,
+    "name":string,
+    "time":number
+    "ip":string,
+    "port":number,
+    "type":number
+    "msg":string
+}
