@@ -10,7 +10,7 @@ find_package(Qt6 REQUIRED COMPONENTS Quick)
 set(CMAKE_AUTORCC ON)
 
 qt_add_executable(appchat_qml_client
-    main.cpp
+    source/main.cpp
 )
 
 qt_add_qml_module(appchat_qml_client
@@ -27,24 +27,26 @@ qt_add_qml_module(appchat_qml_client
         qml/ChatPage.qml
     RESOURCES
         resource.qrc
-        SOURCES ConnectManager.h
-        SOURCES ConnectManager.cpp
-        SOURCES QCustomTcpSession.h QCustomTcpSession.cpp
-        SOURCES Buffer.h Buffer.cpp
-        SOURCES SafeStl.h
-        SOURCES SpinLock.h SpinLock.cpp
-        SOURCES CriticalSectionLock.h CriticalSectionLock.cpp
-        SOURCES QBaseNetWorkSession.h QBaseNetWorkSession.cpp
-        SOURCES QTCPClient.h QTCPClient.cpp
-        SOURCES RequestManager.h RequestManager.cpp
-        SOURCES MsgManager.h MsgManager.cpp
-        SOURCES ChatItemListModel.h ChatItemListModel.cpp
-        SOURCES ModelManager.h
-        SOURCES ModelManager.cpp
-        SOURCES ChatSessionModel.h ChatSessionModel.cpp
-        SOURCES UserInfoModel.h UserInfoModel.cpp
-        SOURCES LoginModel.h LoginModel.cpp
+        SOURCES source/ConnectManager.h
+        SOURCES source/ConnectManager.cpp
+        SOURCES source/QCustomTcpSession.h source/QCustomTcpSession.cpp
+        SOURCES source/Buffer.h source/Buffer.cpp
+        SOURCES source/SafeStl.h
+        SOURCES source/SpinLock.h source/SpinLock.cpp
+        SOURCES source/CriticalSectionLock.h source/CriticalSectionLock.cpp
+        SOURCES source/QBaseNetWorkSession.h source/QBaseNetWorkSession.cpp
+        SOURCES source/QTCPClient.h source/QTCPClient.cpp
+        SOURCES source/RequestManager.h source/RequestManager.cpp
+        SOURCES source/MsgManager.h source/MsgManager.cpp
+        SOURCES source/ChatItemListModel.h source/ChatItemListModel.cpp
+        SOURCES source/ModelManager.h
+        SOURCES source/ModelManager.cpp
+        SOURCES source/ChatSessionModel.h source/ChatSessionModel.cpp
+        SOURCES source/UserInfoModel.h source/UserInfoModel.cpp
+        SOURCES source/LoginModel.h source/LoginModel.cpp
 )
+
+include_directories(source/)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
