@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/">
+        <file>qml/Main.qml</file>
+        <file>qml/ChatItemDelegate.qml</file>
+        <file>qml/ChatView.qml</file>
+        <file>qml/MessageDelegate.qml</file>
+        <file>qml/UserInfoDelegate.qml</file>
+        <file>qml/LoadPage.qml</file>
+        <file>qml/ChatPage.qml</file>
+        <file>qml/ImagePickerButton.qml</file>
+    </qresource>
+</RCC>
