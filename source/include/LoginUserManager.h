@@ -33,16 +33,18 @@ public:
     bool SendLoginInfo(User *u);
 
 public:
-    string PublicChatToken();
-    bool IsPublicChat(const string &token);
     // 获取在线用户
     SafeArray<User *> &GetOnlineUsers();
     bool FindByToken(const string &token, User *&out);
+
+public:
+    static string PublicChatToken();
+    static bool IsPublicChat(const string &token);
 
 public:
     void SetMsgManager(MsgManager *m);
 
 private:
     SafeArray<User *> OnlineUsers;
-    MsgManager* HandleMsgManager;
+    MsgManager *HandleMsgManager;
 };

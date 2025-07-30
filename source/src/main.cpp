@@ -2,6 +2,7 @@
 #include "ConnectManager.h"
 #include "LoginUserManager.h"
 #include "MsgManager.h"
+#include "MessageRecordStore.h"
 
 int main()
 {
@@ -18,6 +19,8 @@ int main()
     MsgHost.SetLoginUserManager(&LoginUserHost);
     LoginUserHost.SetMsgManager(&MsgHost);
 
+    //开启消息记录存储
+    MESSAGERECORDSTORE->SetEnable(true);
 
     NetWorkSessionListener listener(SessionType::CustomTCPSession);
     listener.BindSessionEstablishCallBack(std::bind(&ConnectManager::callBackSessionEstablish, &ConnectHost, std::placeholders::_1));

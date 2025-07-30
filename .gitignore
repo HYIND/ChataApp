@@ -54,3 +54,6 @@ compile_commands.json
 *_qmlcache.qrc
 
 bin/
+
+build/
+!build/CMakeLists.txt

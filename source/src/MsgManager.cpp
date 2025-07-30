@@ -1,4 +1,5 @@
 #include "MsgManager.h"
+#include "MessageRecordStore.h"
 
 enum class MsgType
 {
@@ -89,16 +90,28 @@ bool MsgManager::BroadCastPublicChatMsg(string token, json &js_src)
 
     auto &Users = HandleLoginUser->GetOnlineUsers();
 
+    int64_t time = GetTimeStampSecond();
     json js;
     js["command"] = 2003;
     js["srctoken"] = sender->token;
     js["goaltoken"] = HandleLoginUser->PublicChatToken();
     js["name"] = sender->name;
-    js["time"] = GetTimeStampSecond();
+    js["time"] = time;
     js["ip"] = sender->ip;
     js["port"] = sender->port;
     js["type"] = int(type);
     js["msg"] = msg;
+
+    MESSAGERECORDSTORE->StoreMsg(
+        MsgRecord{
+            .srctoken = sender->token,
+            .goaltoken = HandleLoginUser->PublicChatToken(),
+            .name = sender->name,
+            .time = time,
+            .ip = sender->ip,
+            .port = sender->port,
+            .type = int(type),
+            .msg = msg});
 
     Users.EnsureCall([&](auto &array) -> void
                      {
@@ -129,16 +142,28 @@ bool MsgManager::ForwardChatMsg(string srctoken, string goaltoken, json &js_src)
     MsgType type = (MsgType)(js_src["type"]);
     string msg = js_src["msg"];
 
+    int64_t time = GetTimeStampSecond();
     json js;
     js["command"] = 2003;
     js["srctoken"] = sender->token;
     js["goaltoken"] = recver->token;
     js["name"] = sender->name;
-    js["time"] = GetTimeStampSecond();
+    js["time"] = time;
     js["ip"] = sender->ip;
     js["port"] = sender->port;
     js["type"] = int(type);
     js["msg"] = msg;
+
+    MESSAGERECORDSTORE->StoreMsg(
+        MsgRecord{
+            .srctoken = sender->token,
+            .goaltoken = recver->token,
+            .name = sender->name,
+            .time = time,
+            .ip = sender->ip,
+            .port = sender->port,
+            .type = int(type),
+            .msg = msg});
 
     Buffer buf = js.dump();
     for (auto user : {sender, recver})
