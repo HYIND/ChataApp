@@ -68,7 +68,12 @@ bool FileIOHandler::IsOpen() const
     return fd != -1;
 }
 
-long FileIOHandler::Read(void *buf, size_t bytesToRead)
+std::string FileIOHandler::FilePath() const
+{
+    return file_path;
+}
+
+long FileIOHandler::Read(char *buf, size_t bytesToRead)
 {
     mutex.Enter();
     long result = 0;
@@ -77,7 +82,7 @@ long FileIOHandler::Read(void *buf, size_t bytesToRead)
         if (!CheckOpen())
             return result;
 
-        result = ::read(fd, buf, bytesToRead);
+        result = ::read(fd, (void *)buf, bytesToRead);
         if (result < 0)
         {
             throw std::system_error(errno, std::system_category(), "Read failed");
@@ -99,11 +104,11 @@ long FileIOHandler::Read(Buffer &buffer, size_t bytesToRead)
     {
         buffer.ReSize(buffer.Postion() + bytesToRead);
     }
-    int result = Read(buffer.Data() + buffer.Postion(), bytesToRead);
+    int result = Read(buffer.Byte() + buffer.Postion(), bytesToRead);
     return result;
 }
 
-long FileIOHandler::Write(void *buf, size_t bytesToWrite)
+long FileIOHandler::Write(const char *buf, size_t bytesToWrite)
 {
     mutex.Enter();
     long result = 0;
@@ -111,7 +116,7 @@ long FileIOHandler::Write(void *buf, size_t bytesToWrite)
     {
         if (!CheckOpen())
             return result;
-        result = ::write(fd, buf, bytesToWrite);
+        result = ::write(fd, (const void *)buf, bytesToWrite);
         if (result < 0)
         {
             throw std::system_error(errno, std::system_category(), "Write failed");
@@ -128,7 +133,7 @@ long FileIOHandler::Write(void *buf, size_t bytesToWrite)
 
 long FileIOHandler::Write(const Buffer &buf)
 {
-    return Write(buf.Data(), buf.Length());
+    return Write(buf.Byte(), buf.Length());
 }
 
 long FileIOHandler::Seek(SeekOrigin origin, long offset)

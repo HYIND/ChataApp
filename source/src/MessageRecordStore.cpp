@@ -139,7 +139,7 @@ bool MessageRecordStore::StoreMsg(const MsgRecord &msg)
         int buflen = buf.Length();
 
         int writecount = 0;
-        writecount += handler.Write(&buflen, sizeof(buflen));
+        writecount += handler.Write((char *)(&buflen), sizeof(buflen));
         writecount += handler.Write(buf);
 
         result = writecount == (sizeof(buflen) + buf.Length());
@@ -171,7 +171,7 @@ vector<MsgRecord> MessageRecordStore::FetchMsg(const string &srctoken, const str
     while (remind > sizeof(int))
     {
         int buflen = 0;
-        handler.Read(&buflen, sizeof(buflen));
+        handler.Read((char *)(&buflen), sizeof(buflen));
         remind -= sizeof(buflen);
 
         if (remind < buflen)

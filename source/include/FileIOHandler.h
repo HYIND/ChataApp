@@ -30,12 +30,14 @@ public:
     // 文件操作接口
     bool Open(const std::string &path, OpenMode mode);
     void Close();
+
     bool IsOpen() const;
+    std::string FilePath() const;
 
 public:
-    long Read(void *buf, size_t bytesToRead);
+    long Read(char *buf, size_t bytesToRead);
     long Read(Buffer &buf, size_t bytesToRead);
-    long Write(void *buf, size_t bytesToWrite);
+    long Write(const char *buf, size_t bytesToWrite);
     long Write(const Buffer &buf);
     long Seek(SeekOrigin origin, long offset = 0);
 
