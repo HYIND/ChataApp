@@ -29,6 +29,7 @@ public:
     void OnPeerClose(BaseNetWorkSession* s);
     void OnRecvMessage(BaseNetWorkSession* s,Buffer* recv,Buffer* response);
 
+    CustomTcpSession* Session()const;
 signals:
     void initialized();
     void signal_Login(const QString& IP,quint16 port);

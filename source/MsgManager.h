@@ -17,10 +17,11 @@ public:
 public:
     void ProcessMsg(QByteArray *bytes);
 
-public:
+protected:
     void ProcessLoginInfo(const QJsonObject& jsonObj);
     void ProcessOnlineUser(const QJsonObject& jsonObj);
     void ProcessUserMsg(const QJsonObject& jsonObj);
+    void ProcessUserMsgRecord(const QJsonObject& jsonObj);
 
 public:
     bool isPublicChat(const QString& token);
@@ -29,7 +30,7 @@ public:
 private:
     MsgManager();
     ~MsgManager();
-
+    
 public:
     QString m_ip;
     int m_port;

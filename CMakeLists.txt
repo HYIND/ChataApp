@@ -24,7 +24,9 @@ qt_add_qml_module(appchat_qml_client
         qml/UserInfoDelegate.qml
         qml/LoadPage.qml
         qml/ImagePickerButton.qml
+        qml/FilePickerButton.qml
         qml/ChatPage.qml
+        qml/ImgPreviewWindow.qml
     RESOURCES
         resource.qrc
         SOURCES source/ConnectManager.h
@@ -44,9 +46,18 @@ qt_add_qml_module(appchat_qml_client
         SOURCES source/ChatSessionModel.h source/ChatSessionModel.cpp
         SOURCES source/UserInfoModel.h source/UserInfoModel.cpp
         SOURCES source/LoginModel.h source/LoginModel.cpp
+        SOURCES source/FileTransManager.h source/FileTransManager.cpp
+        SOURCES source/FileTransferTask.h source/FileTransferTask.cpp
+        SOURCES source/FileTransferDownLoadTask.h source/FileTransferDownLoadTask.cpp
+        SOURCES source/FileTransferUpLoadTask.h source/FileTransferUpLoadTask.cpp
+        SOURCES source/FileIOHandler.h source/FileIOHandler.cpp
 )
 
 include_directories(source/)
+include_directories(ThirdParty/)
+
+find_package(Qt6 COMPONENTS Core5Compat REQUIRED)
+target_link_libraries(appchat_qml_client PUBLIC Qt6::Core5Compat)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

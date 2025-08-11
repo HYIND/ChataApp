@@ -8,5 +8,7 @@
         <file>qml/LoadPage.qml</file>
         <file>qml/ChatPage.qml</file>
         <file>qml/ImagePickerButton.qml</file>
+        <file>qml/FilePickerButton.qml</file>
+        <file>qml/ImgPreviewWindow.qml</file>
     </qresource>
 </RCC>

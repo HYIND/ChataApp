@@ -4,6 +4,18 @@ import QtQuick.Controls
 Item {
     id:root
 
+    // MouseArea{
+    //     anchors.fill: parent
+    //     propagateComposedEvents: true
+    //     onClicked: (mouse)=>{
+    //         console.log("item clicked")
+    //         mouse.accepted = false
+    //     }
+    //     onPositionChanged: (mouse)=>{
+    //         mouse.accepted = false
+    //     }
+    // }
+
     Row {
         id:mainContent
         visible: true

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls 2.15
 
 Item {
     id: root
@@ -40,24 +41,32 @@ Item {
                 spacing: 3
                 clip: true
 
-                Text {
+                TextArea {
                     text: model.username
                     font.bold: true
                     font.pixelSize: 18
-                    elide: Text.ElideRight
                     Layout.fillWidth: true
                     clip: true
-                    maximumLineCount: 1  // 最大行数限制
+                    background: Rectangle {
+                        color: "transparent"
+                    }
+                    wrapMode: Text.NoWrap
+                    readOnly: true
+                    selectByMouse: true
                 }
 
-                Text {
+                TextArea {
                     text: model.useraddress
                     color: "#666666"
                     font.pixelSize: 14
-                    elide: Text.ElideRight
                     Layout.fillWidth: true
                     clip: true
-                    maximumLineCount: 1  // 最大行数限制
+                    background: Rectangle {
+                        color: "transparent"
+                    }
+                    wrapMode: Text.NoWrap
+                    readOnly: true
+                    selectByMouse: true
                 }
             }
         }

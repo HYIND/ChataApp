@@ -6,7 +6,15 @@
 
 enum class MsgType{
     text = 1,
-    picture
+    picture =2 ,
+    file =3
+};
+
+enum class FileStatus{
+    Stop = 0,
+    Transing = 1,
+    Success = 2,
+    Fail = 3
 };
 
 class ChatMsg{
@@ -14,8 +22,8 @@ class ChatMsg{
 public:
     ChatMsg() = default;
     ChatMsg(const QString& srctoken, const QString& name, const QString& address,
-            const QDateTime& time,const MsgType type ,const QString& msg)
-        : name(name), address(address), time(time), type(type), msg(msg){}
+            const QDateTime& time,const MsgType type ,const QString& msg,
+            const QString& filename="",uint64_t filesize=0, const QString& md5 = "", const QString& fileid = "");
 
     // 添加比较运算符便于排序
     bool operator<(const ChatMsg& other) const {
@@ -29,7 +37,12 @@ public:
             {"name", name},
             {"address", address},
             {"time", time},
-            {"msg", msg}
+            {"msg", msg},
+            {"filename", filename},
+            {"filesizestr", filesizestr},
+            {"md5",md5},
+            {"fileid",fileid},
+            {"fileprogress",fileprogress}
         };
     }
 
@@ -41,6 +54,13 @@ public:
     QDateTime time;
     MsgType type;
     QString msg;
+    QString filename;
+    uint64_t filesize;
+    QString filesizestr;
+    QString md5;
+    QString fileid;
+    uint32_t fileprogress=0;
+    FileStatus filestatus=FileStatus::Stop;
 };
 
 class ChatItemData {
@@ -52,10 +72,21 @@ public:
         : token(token), name(name), address(address),isOnline(true),hasUnread(false) {}
 
     // 添加消息处理方法
-    void addMessage(const ChatMsg& msg) {
-        chatmsgs.append(msg);
-        // 可以在这里自动排序
-        std::sort(chatmsgs.begin(), chatmsgs.end());
+    bool addMessage(const ChatMsg& msg) {
+        // 检查是否已存在相同记录
+        bool isDuplicate = std::any_of(
+            chatmsgs.begin(),
+            chatmsgs.end(),
+            [&msg](const ChatMsg& existingMsg) {
+                return msg.srctoken == existingMsg.srctoken && msg.time == existingMsg.time && msg.type == existingMsg.type;
+            }
+            );
+
+        if (!isDuplicate) {
+            chatmsgs.append(msg);
+            std::sort(chatmsgs.begin(), chatmsgs.end());
+        }
+        return !isDuplicate;
     }
 
     // 转换为QVariantMap
@@ -111,7 +142,12 @@ public:
     void addChatItem(const ChatItemData &item);
     void addChatItem(const QList<ChatItemData> &item);
     void deleteChatItem(const QString& token);
-    void addNewMsg(const QString& srctoken, const QString& goaltoken,const QDateTime& time, const QString& name, const QString& address, const MsgType type, const QString& msg);
+    void addNewMsg(const QString& goaltoken,const ChatMsg& chatmsg);
+
+    void fileTransProgressChange(const QString& fileid,uint32_t progress);
+    void fileTransInterrupted(const QString& fileid);
+    void fileTransFinished(const QString& fileid);
+    void fileTransError(const QString& fileid);
 
 public:
     bool findbytoken(const QString& token,int* pindex=nullptr);

@@ -1,6 +1,37 @@
 #include "ModelManager.h"
 #include "ChatItemListModel.h"
 #include "MsgManager.h"
+#include "FileTransManager.h"
+#include "RequestManager.h"
+
+QString getFileSizeStr(uint64_t filesize)
+{
+    const uint64_t KB = 1024;
+    const uint64_t MB = KB * 1024;
+    const uint64_t GB = MB * 1024;
+    const uint64_t TB = GB * 1024;
+
+    if (filesize < KB) {
+        return QString("%1 B").arg(filesize);
+    } else if (filesize < MB) {
+        return QString("%1 KB").arg(QString::number(filesize / static_cast<double>(KB), 'f', 1));
+    } else if (filesize < GB) {
+        return QString("%1 MB").arg(QString::number(filesize / static_cast<double>(MB), 'f', 1));
+    } else if (filesize < TB) {
+        return QString("%1 GB").arg(QString::number(filesize / static_cast<double>(GB), 'f', 1));
+    } else {
+        return QString("%1 TB").arg(QString::number(filesize / static_cast<double>(TB), 'f', 1));
+    }
+}
+
+ChatMsg::ChatMsg(const QString &srctoken, const QString &name, const QString &address,
+                 const QDateTime &time, const MsgType type,const QString &msg,
+                 const QString &filename, uint64_t filesize, const QString &md5, const QString &fileid)
+    :srctoken(srctoken),name(name), address(address), time(time), type(type), msg(msg),filename(filename),filesize(filesize),md5(md5),fileid(fileid)
+{
+    filesizestr = getFileSizeStr(filesize);
+}
+
 
 ChatItemListModel::ChatItemListModel(QObject *parent) : QAbstractListModel(parent)
 {
@@ -98,9 +129,8 @@ void ChatItemListModel::addChatItem(const QList<ChatItemData> &items)
     }
 }
 
-void ChatItemListModel::addNewMsg(const QString& srctoken, const QString& goaltoken,const QDateTime& time, const QString& name, const QString& address, const MsgType type, const QString& msg)
+void ChatItemListModel::addNewMsg(const QString& goaltoken,const ChatMsg& chatmsg)
 {
-
 
     int index = -1;
     QString itemtoken;
@@ -108,7 +138,7 @@ void ChatItemListModel::addNewMsg(const QString& srctoken, const QString& goalto
     if(MSGMANAGER->isPublicChat(goaltoken))
         itemtoken = goaltoken;
     else
-        itemtoken = !USERINFOMODEL->isMyToken(srctoken) ? srctoken : goaltoken;
+        itemtoken = !USERINFOMODEL->isMyToken(chatmsg.srctoken) ? chatmsg.srctoken : goaltoken;
 
     for (int i=0;i<m_chatitems.size();i++)
     {
@@ -120,28 +150,24 @@ void ChatItemListModel::addNewMsg(const QString& srctoken, const QString& goalto
 
     if(index==-1)
     {
-        ChatItemData item(itemtoken,name,address);
+        ChatItemData item(itemtoken,chatmsg.name,chatmsg.address);
         index = m_chatitems.size() - 1;
         addChatItem(item);
     }
 
-    m_chatitems[index].lastmsgusername = name;
-    m_chatitems[index].lastmsgtime = time;
-    if (type == MsgType::picture)
+    if(!m_chatitems[index].addMessage(chatmsg))
+        return;
+
+    m_chatitems[index].lastmsgusername = chatmsg.name;
+    m_chatitems[index].lastmsgtime = chatmsg.time;
+    if (chatmsg.type == MsgType::picture)
         m_chatitems[index].lastmsg="[图片]";
+    else if (chatmsg.type == MsgType::file)
+        m_chatitems[index].lastmsg="[文件]";
     else
-        m_chatitems[index].lastmsg=msg;
+        m_chatitems[index].lastmsg=chatmsg.msg;
 
-    ChatMsg chatmsg;
-    chatmsg.srctoken = srctoken;
-    chatmsg.name = name;
-    chatmsg.address = address;
-    chatmsg.time = time;
-    chatmsg.type = type;
-    chatmsg.msg = msg;
-    m_chatitems[index].addMessage(chatmsg);
-
-    if(SESSIONMODEL->sessionToken()!=itemtoken && !USERINFOMODEL->isMyToken(srctoken))
+    if(SESSIONMODEL->sessionToken()!=itemtoken && !USERINFOMODEL->isMyToken(chatmsg.srctoken))
         m_chatitems[index].hasUnread = true;
 
     QModelIndex modelIndex = createIndex(index, 0);
@@ -161,6 +187,134 @@ void ChatItemListModel::addNewMsg(const QString& srctoken, const QString& goalto
 
     if(SESSIONMODEL->sessionToken()==itemtoken)
         SESSIONMODEL->addMessage(chatmsg);
+
+    if (chatmsg.type == MsgType::file)
+    {
+        if(USERINFOMODEL->isMyToken(chatmsg.srctoken))
+        {
+            FILETRANSMANAGER->ReqUploadFile(chatmsg.fileid);
+        }
+        else
+        {
+            QString filepath = FILETRANSMANAGER->DownloadDir() + chatmsg.filename;
+            FILETRANSMANAGER->AddReqRecord(chatmsg.fileid, filepath, chatmsg.filesize, chatmsg.md5);
+        }
+    }
+}
+
+void ChatItemListModel::fileTransProgressChange(const QString &fileid, uint32_t progress)
+{
+    bool find = false;
+    QString itemtoken;
+    for (int i=0;i<m_chatitems.size();i++)
+    {
+        if(find)
+            break;
+        for(auto & msg:m_chatitems[i].chatmsgs)
+        {
+            if(msg.type!=MsgType::file)
+                continue;
+            if(msg.fileid == fileid)
+            {
+                find = true;
+                itemtoken = m_chatitems[i].token;
+                msg.fileprogress = progress;
+                msg.filestatus = FileStatus::Transing;
+                break;
+            }
+        }
+    }
+    if (find)
+    {
+        if(SESSIONMODEL->sessionToken()==itemtoken)
+            SESSIONMODEL->fileTransProgressChange(fileid,progress);
+    }
+}
+
+void ChatItemListModel::fileTransInterrupted(const QString &fileid)
+{
+    bool find = false;
+    QString itemtoken;
+    for (int i=0;i<m_chatitems.size();i++)
+    {
+        if(find)
+            break;
+        for(auto & msg:m_chatitems[i].chatmsgs)
+        {
+            if(msg.type!=MsgType::file)
+                continue;
+            if(msg.fileid == fileid)
+            {
+                find = true;
+                itemtoken = m_chatitems[i].token;
+                msg.filestatus = FileStatus::Stop;
+                break;
+            }
+        }
+    }
+    if (find)
+    {
+        if(SESSIONMODEL->sessionToken()==itemtoken)
+            SESSIONMODEL->fileTransInterrupted(fileid);
+    }
+}
+
+void ChatItemListModel::fileTransFinished(const QString &fileid)
+{
+    bool find = false;
+    QString itemtoken;
+    for (int i=0;i<m_chatitems.size();i++)
+    {
+        if(find)
+            break;
+        for(auto & msg:m_chatitems[i].chatmsgs)
+        {
+            if(msg.type!=MsgType::file)
+                continue;
+            if(msg.fileid == fileid)
+            {
+                find = true;
+                itemtoken = m_chatitems[i].token;
+                msg.fileprogress = 100;
+                msg.filestatus = FileStatus::Success;
+                break;
+            }
+        }
+    }
+    if (find)
+    {
+        if(SESSIONMODEL->sessionToken()==itemtoken)
+            SESSIONMODEL->fileTransFinished(fileid);
+    }
+}
+
+void ChatItemListModel::fileTransError(const QString &fileid)
+{
+    bool find = false;
+    QString itemtoken;
+    for (int i=0;i<m_chatitems.size();i++)
+    {
+        if(find)
+            break;
+        for(auto & msg:m_chatitems[i].chatmsgs)
+        {
+            if(msg.type!=MsgType::file)
+                continue;
+            if(msg.fileid == fileid)
+            {
+                find = true;
+                itemtoken = m_chatitems[i].token;
+                msg.fileprogress = 0;
+                msg.filestatus = FileStatus::Fail;
+                break;
+            }
+        }
+    }
+    if (find)
+    {
+        if(SESSIONMODEL->sessionToken()==itemtoken)
+            SESSIONMODEL->fileTransError(fileid);
+    }
 }
 
 bool ChatItemListModel::findbytoken(const QString &token,int* pindex)
@@ -209,6 +363,7 @@ void ChatItemListModel::activeSession(const QString &token)
 void ChatItemListModel::handleItemClicked(const QString &token)
 {
     SESSIONMODEL->loadSession(token);
+    REQUESTMANAGER->RequestMessageRecord(token);
 }
 
 bool ChatItemListModel::isPublicChatItem(const QString &token)
@@ -255,3 +410,4 @@ void ChatItemListModel::sortItemsByLastMessage()
               });
     endResetModel();
 }
+

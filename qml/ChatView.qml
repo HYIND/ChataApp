@@ -147,13 +147,28 @@ Item {
                     id: textinput_edit
                     height: 40
                     width: parent.width
-                    ImagePickerButton {
-                        height: parent.height
-                        width: 80
-                        onImageSelected: url => {
-                                             sessionModel.sendPicture(
-                                                 sessionModel.sessionToken, url)
-                                         }
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: 30
+                        spacing: 30
+                        ImagePickerButton {
+                            height: parent.height
+                            width: 80
+                            onImageSelected: url => {
+                                                 sessionModel.sendPicture(
+                                                     sessionModel.sessionToken,
+                                                     url)
+                                             }
+                        }
+                        FilePickerButton {
+                            height: parent.height
+                            width: 80
+                            onImageSelected: url => {
+                                                 sessionModel.sendFile(
+                                                     sessionModel.sessionToken,
+                                                     url)
+                                             }
+                        }
                     }
                 }
                 //文本输入区域

@@ -18,7 +18,13 @@ public:
         AddressRole,
         TimeRole,
         TypeRole,
-        MsgRole
+        MsgRole,
+        FileNameRole,
+        FileSizeStrRole,
+        Md5Role,
+        FileIdRole,
+        FileProgressRole,
+        FileStatusRole
     };
 
     explicit ChatSessionModel(QObject *parent = nullptr);
@@ -38,10 +44,19 @@ public:
     void addMessage(const ChatMsg& chatmsg);
     void clearSession();
 
+    void fileTransProgressChange(const QString& fileid,uint32_t progress);
+    void fileTransInterrupted(const QString& fileid);
+    void fileTransFinished(const QString& fileid);
+    void fileTransError(const QString& fileid);
+
 public slots:
     void sendMessage(const QString& goaltoken, const QString& msg);
     void sendPicture(const QString& goaltoken, const QString &url);
+    void sendFile(const QString& goaltoken, const QString &url);
     bool isMyToken(const QString& token);
+
+    void startTrans(const QString& fileid);
+    void stopTrans(const QString& fileid);
 
 signals:
     void sessionTokenChanged();

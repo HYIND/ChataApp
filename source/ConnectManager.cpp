@@ -67,6 +67,11 @@ void ConnectManager::OnRecvMessage(BaseNetWorkSession *s, Buffer *recv, Buffer *
     emit signal_RecvMessage(buffer);
 }
 
+CustomTcpSession *ConnectManager::Session() const
+{
+    return session;
+}
+
 void ConnectManager::slots_Login(const QString &IP, quint16 port)
 {
     if(!session->Connect(IP,port))

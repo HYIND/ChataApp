@@ -1,6 +1,7 @@
 #include "MsgManager.h"
 #include "ConnectManager.h"
 #include "ModelManager.h"
+#include "FileTransManager.h"
 
 QString publicchattoken = "publicchat";
 
@@ -31,6 +32,13 @@ void MsgManager::ProcessMsg(QByteArray *bytes)
     QJsonValue jcommandValue = rootObj.value("command");
     int command = jcommandValue.toInt();
 
+    if (command == 7000 || command == 7001 || command == 7010 || command == 7080 || command == 7070 ||
+        command == 8000 || command == 8001 || command == 8010 || command == 5001)
+    {
+        FILETRANSMANAGER->ProcessMsg(json::parse(bytes->data(),bytes->data()+bytes->length()));
+        return;
+    }
+
     switch (command) {
     case 2000:
         ProcessLoginInfo(rootObj);
@@ -42,6 +50,10 @@ void MsgManager::ProcessMsg(QByteArray *bytes)
         break;
     case 2003:
         ProcessUserMsg(rootObj);
+        break;
+    case 2004:
+        ProcessUserMsgRecord(rootObj);
+        break;
     default:
         break;
     }
@@ -122,7 +134,51 @@ void MsgManager::ProcessUserMsg(const QJsonObject &jsonObj)
 
     QString address = ip+":"+QString::number(port);
 
-    CHATITEMMODEL->addNewMsg(srctoken,goaltoken,time,name,address,type,msg);
+    QString filename;
+    uint64_t filesize=0;
+    QString md5;
+    QString fileid;
+    if(type==MsgType::file)
+    {
+        filename=jsonObj.value("filename").toString();
+        filesize=jsonObj.value("filesize").toInteger();
+        md5=jsonObj.value("md5").toString();
+        fileid=jsonObj.value("fileid").toString();
+    }
+
+    ChatMsg chatmsg(srctoken,
+                    name,
+                    address,
+                    time,
+                    type,
+                    msg,
+                    filename,
+                    filesize,
+                    md5,
+                    fileid);
+
+    CHATITEMMODEL->addNewMsg(goaltoken,chatmsg);
+}
+
+void MsgManager::ProcessUserMsgRecord(const QJsonObject &jsonObj)
+{
+    if(!jsonObj.contains("messages") || !jsonObj.value("messages").isArray())
+        return;
+
+    QJsonArray js_messages = jsonObj.value("messages").toArray();
+
+    for(auto it = js_messages.begin(); it!=js_messages.end(); it++)
+    {
+        if(it->isObject())
+        {
+            QJsonObject msg = it->toObject();
+            ProcessUserMsg(msg);
+        }
+        else
+        {
+            return;
+        }
+    }
 }
 
 bool MsgManager::isPublicChat(const QString& token)
