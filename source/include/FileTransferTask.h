@@ -22,21 +22,39 @@ struct FileTransferChunkData
     void FromBinary(const std::vector<uint8_t> &datas);
 };
 
+std::string getFilenameFromPath(const std::string &filepath);
 std::vector<FileTransferChunkInfo> mergeChunks(const std::vector<FileTransferChunkInfo> &chunks);
 std::vector<FileTransferChunkInfo> getUntransferredChunks(const std::vector<FileTransferChunkInfo> &transferredChunks, uint64_t totalFileSize);
+uint32_t CountProgress(const std::vector<FileTransferChunkInfo> &chunks, uint64_t totalFileSize);
+uint64_t GetSuggestChunsize(uint64_t file_size);
 
 class FileTransferTask
 {
 public:
-    FileTransferTask(const string &filepath, const string &taskid);
+    FileTransferTask(const string &taskid, const string &filepath);
     virtual ~FileTransferTask();
 
     const FileIOHandler &FileHandler();
+    const string TaskId();
+
+public:
+    virtual void ProcessMsg(BaseNetWorkSession *session, const Buffer &buf) = 0;
+    virtual void ProcessMsg(BaseNetWorkSession *session, const json &js) = 0;
+    virtual void ReleaseSource() = 0;
+    virtual void InterruptTrans(BaseNetWorkSession *session) = 0;
 
 protected:
     virtual void OnError() = 0;
     virtual void OnFinished() = 0;
     virtual void OnInterrupted() = 0;
+    virtual void OnProgress(uint32_t progress) = 0;
+
+    virtual void OccurError(BaseNetWorkSession *session) = 0;
+    virtual void OccurFinish() = 0;
+    virtual void OccurInterrupt() = 0;
+    virtual void OccurProgressChange() = 0;
+
+    virtual uint32_t Progress() = 0;
 
 protected:
     string file_path;
@@ -48,6 +66,11 @@ protected:
     bool IsError = false;
     bool IsFinished = false;
     bool IsInterrupted = false;
+
+    bool IsFileEnable = false;
+    bool IsTransFinish = false;
+
+    bool IsNetworkEnable = true;
 
     CriticalSectionLock InterruptedLock;
 };

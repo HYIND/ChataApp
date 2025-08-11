@@ -1,11 +1,7 @@
 #include "MsgManager.h"
 #include "MessageRecordStore.h"
-
-enum class MsgType
-{
-    text = 1,
-    picture
-};
+#include "FileTransManager.h"
+#include "FileRecordStore.h"
 
 int64_t GetTimeStampSecond()
 {
@@ -27,18 +23,27 @@ bool MsgManager::ProcessMsg(BaseNetWorkSession *session, string ip, uint16_t por
     {
         cout << fmt::format("json::parse error : {}\n", str);
     }
+    if (!js.contains("command"))
+        return false;
+    int command = js.at("command");
+
+    if (command == 7000 || command == 7001 || command == 7010 || command == 7080 || command == 7070 ||
+        command == 8000 || command == 8001 || command == 8010 || command == 4001)
+    {
+        FILETRANSMANAGER->ProcessMsg(session, ip, port, js);
+    }
+
     if (!js.contains("token"))
         return false;
     string token = js["token"];
 
     bool success = false;
     if (HandleLoginUser)
-        success = HandleLoginUser->Verfiy(session, token, ip, port);
+        success = HandleLoginUser->Verfiy(session, token);
     if (success)
     {
         if (js.contains("command"))
         {
-            int command = js.at("command");
             if (command == 1001)
             {
                 SendOnlineUserMsg(session, token, ip, port);
@@ -46,6 +51,10 @@ bool MsgManager::ProcessMsg(BaseNetWorkSession *session, string ip, uint16_t por
             if (command == 1002)
             {
                 ProcessChatMsg(session, token, ip, port, js);
+            }
+            if (command == 1003)
+            {
+                ProcessFetchRecord(session, token, js);
             }
         }
     }
@@ -102,16 +111,45 @@ bool MsgManager::BroadCastPublicChatMsg(string token, json &js_src)
     js["type"] = int(type);
     js["msg"] = msg;
 
-    MESSAGERECORDSTORE->StoreMsg(
-        MsgRecord{
-            .srctoken = sender->token,
-            .goaltoken = HandleLoginUser->PublicChatToken(),
-            .name = sender->name,
-            .time = time,
-            .ip = sender->ip,
-            .port = sender->port,
-            .type = int(type),
-            .msg = msg});
+    if (type == MsgType::file)
+    {
+        string filename = js_src["filename"];
+        uint64_t filesize = js_src["filesize"];
+        string md5 = js_src["md5"];
+        string fileid = js_src["fileid"];
+        js["filename"] = filename;
+        js["filesize"] = filesize;
+        js["md5"] = md5;
+        js["fileid"] = fileid;
+
+        FILERECORDSTORE->addFileRecord(fileid, md5, filesize);
+        MESSAGERECORDSTORE->StoreMsg(
+            MsgRecord{
+                .srctoken = sender->token,
+                .goaltoken = HandleLoginUser->PublicChatToken(),
+                .name = sender->name,
+                .time = time,
+                .ip = sender->ip,
+                .port = sender->port,
+                .type = type,
+                .filename = filename,
+                .filesize = filesize,
+                .md5 = md5,
+                .fileid = fileid});
+    }
+    else
+    {
+        MESSAGERECORDSTORE->StoreMsg(
+            MsgRecord{
+                .srctoken = sender->token,
+                .goaltoken = HandleLoginUser->PublicChatToken(),
+                .name = sender->name,
+                .time = time,
+                .ip = sender->ip,
+                .port = sender->port,
+                .type = type,
+                .msg = msg});
+    }
 
     Users.EnsureCall([&](auto &array) -> void
                      {
@@ -154,16 +192,42 @@ bool MsgManager::ForwardChatMsg(string srctoken, string goaltoken, json &js_src)
     js["type"] = int(type);
     js["msg"] = msg;
 
-    MESSAGERECORDSTORE->StoreMsg(
-        MsgRecord{
-            .srctoken = sender->token,
-            .goaltoken = recver->token,
-            .name = sender->name,
-            .time = time,
-            .ip = sender->ip,
-            .port = sender->port,
-            .type = int(type),
-            .msg = msg});
+    if (type == MsgType::file)
+    {
+        string filename = js_src["filename"];
+        uint64_t filesize = js_src["filesize"];
+        string md5 = js_src["md5"];
+        string fileid = js_src["fileid"];
+        js["filename"] = filename;
+        js["filesize"] = filesize;
+        js["md5"] = md5;
+        js["fileid"] = fileid;
+
+        FILERECORDSTORE->addFileRecord(fileid, md5, filesize);
+        MESSAGERECORDSTORE->StoreMsg(
+            MsgRecord{
+                .srctoken = sender->token,
+                .goaltoken = recver->token,
+                .name = sender->name,
+                .time = time,
+                .ip = sender->ip,
+                .port = sender->port,
+                .type = type,
+                .fileid = fileid});
+    }
+    else
+    {
+        MESSAGERECORDSTORE->StoreMsg(
+            MsgRecord{
+                .srctoken = sender->token,
+                .goaltoken = recver->token,
+                .name = sender->name,
+                .time = time,
+                .ip = sender->ip,
+                .port = sender->port,
+                .type = type,
+                .msg = msg});
+    }
 
     Buffer buf = js.dump();
     for (auto user : {sender, recver})
@@ -198,6 +262,50 @@ bool MsgManager::SendOnlineUserMsg(BaseNetWorkSession *session, string token, st
         } });
 
     js["users"] = js_users;
+
+    Buffer buf = js.dump();
+    session->AsyncSend(buf);
+
+    return true;
+}
+
+bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, string token, json &js_src)
+{
+    if (!js_src.contains("goaltoken"))
+        return false;
+
+    string srctoken = token;
+    string goaltoken = js_src["goaltoken"];
+
+    vector<MsgRecord> MsgRecords = MESSAGERECORDSTORE->FetchLastMsg(srctoken, goaltoken);
+
+    json js;
+    js["command"] = 2004;
+
+    json js_messages = json::array();
+    for (auto &msgrecord : MsgRecords)
+    {
+        json js_record;
+        js_record["srctoken"] = msgrecord.srctoken;
+        js_record["goaltoken"] = msgrecord.goaltoken;
+        js_record["name"] = msgrecord.name;
+        js_record["time"] = msgrecord.time;
+        js_record["ip"] = msgrecord.ip;
+        js_record["port"] = msgrecord.port;
+        js_record["type"] = int(msgrecord.type);
+        js_record["msg"] = msgrecord.msg;
+
+        if (msgrecord.type == MsgType::file)
+        {
+            js_record["filename"] = msgrecord.filename;
+            js_record["filesize"] = msgrecord.filesize;
+            js_record["md5"] = msgrecord.md5;
+            js_record["fileid"] = msgrecord.fileid;
+        }
+
+        js_messages.emplace_back(js_record);
+    }
+    js["messages"] = js_messages;
 
     Buffer buf = js.dump();
     session->AsyncSend(buf);

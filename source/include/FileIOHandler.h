@@ -48,6 +48,7 @@ public:
 public:
     static bool Exists(const std::string &path);
     static bool Remove(const std::string &path);
+    static bool CreateFolder(const std::string &path);
 
 private:
     bool CheckOpen() const;

@@ -28,7 +28,7 @@ public:
     // 登出
     bool Logout(BaseNetWorkSession *session, string token, string ip, uint16_t port);
     // 验证
-    bool Verfiy(BaseNetWorkSession *session, string token, string ip, uint16_t port);
+    bool Verfiy(BaseNetWorkSession *session, string token);
     // 用户登录后返回给用户的登录信息
     bool SendLoginInfo(User *u);
 

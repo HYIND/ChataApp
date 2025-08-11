@@ -1,7 +1,12 @@
 #include "FileTransferDownLoadTask.h"
 
+#define enabledisplay 0
+
 void displayTransferProgress(uint64_t totalSize, const std::vector<FileTransferChunkInfo> &transferredChunks, int barWidth = 160)
 {
+    if (enabledisplay != 1)
+        return;
+
     // 合并重叠或连续的 chunk
     std::vector<FileTransferChunkInfo> merged;
     if (!transferredChunks.empty())
@@ -86,34 +91,42 @@ std::string getChunkFilePath(const std::string &filepath)
 bool ExtractBinaryJson(json jsbinary, std::vector<uint8_t> &v)
 {
     bool result = false;
-    std::vector<uint8_t> bytes;
     if (jsbinary.is_object() && jsbinary.contains("bytes"))
     {
         const auto &bytes_field = jsbinary["bytes"];
         if (bytes_field.is_array())
         {
-            // 确保数组元素是数字
-            // 注意：get<vector<uint8_t>>() 会自动处理数字到 uint8_t 的转换，并进行类型检查
             try
             {
-                bytes = bytes_field.get<std::vector<uint8_t>>();
+                const size_t size = bytes_field.size();
+                v.reserve(v.size() + size); // 预分配空间
+
+                for (const auto &item : bytes_field)
+                {
+                    if (!item.is_number())
+                    {
+                        v.clear();
+                        return false;
+                    }
+                    v.push_back(static_cast<uint8_t>(item.get<int>()));
+                }
                 result = true;
             }
             catch (const json::exception &e)
             {
                 cout << "error when ExtractBinaryJson: " + std::string(e.what()) << endl;
+                result = false;
             }
         }
     }
-    if (result)
-        v.insert(v.end(), bytes.begin(), bytes.end());
     return result;
 }
 
-FileTransferDownLoadTask::FileTransferDownLoadTask(const string &filepath, const string &taskid, uint64_t length)
-    : FileTransferTask(filepath, taskid)
+FileTransferDownLoadTask::FileTransferDownLoadTask(const string &taskid, const string &filepath_dir)
+    : FileTransferTask(taskid, filepath_dir)
 {
 }
+
 FileTransferDownLoadTask::~FileTransferDownLoadTask()
 {
 }
@@ -139,7 +152,8 @@ void FileTransferDownLoadTask::InterruptTrans(BaseNetWorkSession *session)
         js_error["result"] = 0;
 
         Buffer buf = js_error.dump();
-        session->AsyncSend(buf);
+        if (!session->AsyncSend(buf))
+            IsNetworkEnable = false;
 
         OccurInterrupt();
     }
@@ -213,7 +227,9 @@ bool FileTransferDownLoadTask::ParseChunkMap(const json &js)
             chunkmap.emplace_back(info);
         }
         if (parseresult)
-            chunk_map = chunkmap;
+        {
+            chunk_map = mergeChunks(chunkmap);
+        }
     }
     return parseresult;
 }
@@ -265,7 +281,8 @@ void FileTransferDownLoadTask::OccurError(BaseNetWorkSession *session)
     if (!IsError)
     {
         IsError = true;
-        SendErrorInfo(session);
+        if (IsNetworkEnable)
+            SendErrorInfo(session);
         OnError();
     }
 }
@@ -274,9 +291,9 @@ void FileTransferDownLoadTask::OccurFinish()
 {
     if (!IsFinished)
     {
+        OccurProgressChange();
         IsFinished = true;
         OnFinished();
-        ReleaseSource();
     }
 }
 
@@ -286,11 +303,21 @@ void FileTransferDownLoadTask::OccurInterrupt()
     {
         IsInterrupted = true;
         OnInterrupted();
-        ReleaseSource();
     }
 }
 
-void FileTransferDownLoadTask::AckTransReq(BaseNetWorkSession *session, const json &js)
+void FileTransferDownLoadTask::OccurProgressChange()
+{
+    uint32_t progress = Progress();
+    OnProgress(progress);
+}
+
+uint32_t FileTransferDownLoadTask::Progress()
+{
+    return CountProgress(chunk_map, file_size);
+}
+
+void FileTransferDownLoadTask::RecvTransReq(BaseNetWorkSession *session, const json &js)
 {
     if (js.contains("filesize") && js.at("filesize").is_number_unsigned() && js.contains("filename") && js.at("filename").is_string())
     {
@@ -298,7 +325,7 @@ void FileTransferDownLoadTask::AckTransReq(BaseNetWorkSession *session, const js
         string filename = js.at("filename");
 
         file_size = filesize;
-        file_path = "/home/h/ChatServer/MainServer/bin/downloadtest/" + filename;
+        file_path = file_path + filename;
     }
     else
     {
@@ -314,7 +341,7 @@ void FileTransferDownLoadTask::AckTransReq(BaseNetWorkSession *session, const js
     js_reply["result"] = IsFileEnable;
     js_reply["filesize"] = file_size;
     js_reply["result"] = IsFileEnable == true ? 1 : 0;
-    js_reply["suggest_chunsize"] = std::max((uint64_t)1, file_size / (uint64_t)10);
+    js_reply["suggest_chunsize"] = GetSuggestChunsize(file_size);
 
     json js_chunkmap = json::array();
     for (auto &chunkinfo : chunk_map)
@@ -334,7 +361,68 @@ void FileTransferDownLoadTask::AckTransReq(BaseNetWorkSession *session, const js
 
     Buffer buf = js_reply.dump();
     if (!session->AsyncSend(buf))
+    {
+        IsNetworkEnable = false;
         OccurError(session);
+    }
+
+    OccurProgressChange();
+}
+
+void FileTransferDownLoadTask::AckTransReq(BaseNetWorkSession *session, const json &js)
+{
+    bool ackresult = false;
+    if (js.contains("filesize") && js.at("filesize").is_number_unsigned() && js.contains("filename") && js.at("filename").is_string())
+    {
+        uint64_t filesize = js.at("filesize");
+        string filename = js.at("filename");
+
+        ackresult = ((file_size == filesize) /* && (getFilenameFromPath(file_path) == filename) */);
+    }
+    else
+    {
+        OccurError(session);
+        return;
+    }
+
+    if (ackresult)
+        ParseFile();
+
+    json js_reply;
+    js_reply["command"] = 8000;
+    js_reply["taskid"] = task_id;
+    js_reply["filesize"] = file_size;
+    js_reply["result"] = (ackresult && IsFileEnable) == true ? 1 : 0;
+    js_reply["suggest_chunsize"] = GetSuggestChunsize(file_size);
+
+    if (ackresult)
+    {
+        json js_chunkmap = json::array();
+        for (auto &chunkinfo : chunk_map)
+        {
+            json js_info;
+            js_info["index"] = chunkinfo.index;
+
+            json js_range = json::array();
+            js_range.emplace_back(chunkinfo.range_left);
+            js_range.emplace_back(chunkinfo.range_right);
+            js_info["range"] = js_range;
+            js_chunkmap.emplace_back(js_info);
+        }
+        displayTransferProgress(file_size, chunk_map);
+
+        js_reply["chunk_map"] = js_chunkmap;
+    }
+
+    Buffer buf = js_reply.dump();
+    if (!session->AsyncSend(buf))
+    {
+        IsNetworkEnable = false;
+        OccurError(session);
+    }
+
+    if (ackresult)
+        OccurProgressChange();
 }
 
 void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, const json &js)
@@ -442,11 +530,16 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
     Buffer buf = js_reply.dump();
     if (!session->AsyncSend(buf))
     {
+        IsNetworkEnable = false;
         OccurError(session);
         return;
     }
     if (finished)
         OccurFinish();
+    else
+    {
+        OccurProgressChange();
+    }
 }
 
 void FileTransferDownLoadTask::AckRecvFinished(BaseNetWorkSession *session, const json &js)
@@ -465,7 +558,8 @@ void FileTransferDownLoadTask::AckRecvFinished(BaseNetWorkSession *session, cons
         js_reply["result"] = IsFinished ? 1 : 0;
 
         Buffer buf = js_reply.dump();
-        session->AsyncSend(buf);
+        if (!session->AsyncSend(buf))
+            IsNetworkEnable = false;
     }
     else
     {
@@ -481,7 +575,15 @@ void FileTransferDownLoadTask::SendErrorInfo(BaseNetWorkSession *session)
     js_error["result"] = 0;
 
     Buffer buf = js_error.dump();
-    session->AsyncSend(buf);
+    try
+    {
+        if (!session->AsyncSend(buf))
+            IsNetworkEnable = false;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "SendErrorInfo error!" << e.what() << '\n';
+    }
 }
 
 void FileTransferDownLoadTask::RecvPeerError(const json &js)
@@ -503,8 +605,8 @@ void FileTransferDownLoadTask::OnError()
 {
     try
     {
-        FileIOHandler::Remove(chunkfile_io.FilePath());
         ReleaseSource();
+        FileIOHandler::Remove(chunkfile_io.FilePath());
         if (_callbackError)
             _callbackError(this);
     }
@@ -517,8 +619,8 @@ void FileTransferDownLoadTask::OnFinished()
 {
     try
     {
-        FileIOHandler::Remove(chunkfile_io.FilePath());
         ReleaseSource();
+        FileIOHandler::Remove(chunkfile_io.FilePath());
         if (_callbackFinieshed)
             _callbackFinieshed(this);
     }
@@ -540,18 +642,34 @@ void FileTransferDownLoadTask::OnInterrupted()
     }
 }
 
+void FileTransferDownLoadTask::OnProgress(uint32_t progress)
+{
+    try
+    {
+        if (_callbackProgress)
+            _callbackProgress(this, progress);
+    }
+    catch (const std::exception &e)
+    {
+    }
+}
+
 void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const Buffer &buf)
 {
-    string str(buf.Byte(), buf.Length());
     json js;
     try
     {
-        js = json::parse(str);
+        js = json::parse(buf.Byte(), buf.Byte() + buf.Length());
     }
     catch (...)
     {
-        cout << fmt::format("json::parse error : {}\n", str);
+        cout << fmt::format("json::parse error : {}\n", string(buf.Byte(), buf.Length()));
     }
+    ProcessMsg(session, js);
+}
+
+void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const json &js)
+{
     if (js.contains("taskid"))
     {
         string taskid = js.at("taskid");
@@ -576,7 +694,10 @@ void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const Buf
 
             Buffer buf_data = js_success.dump();
             if (!session->AsyncSend(buf_data))
+            {
+                IsNetworkEnable = false;
                 OccurError(session);
+            }
             return;
         }
 
@@ -595,7 +716,10 @@ void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const Buf
         }
         if (command == 7000)
         {
-            AckTransReq(session, js);
+            if (IsRegister)
+                AckTransReq(session, js);
+            else
+                RecvTransReq(session, js);
         }
         if (command == 7001)
         {
@@ -627,4 +751,16 @@ void FileTransferDownLoadTask::BindFinishedCallBack(std::function<void(FileTrans
 void FileTransferDownLoadTask::BindInterruptedCallBack(std::function<void(FileTransferDownLoadTask *)> callback)
 {
     _callbackInterrupted = callback;
+}
+
+void FileTransferDownLoadTask::BindProgressCallBack(std::function<void(FileTransferDownLoadTask *, uint32_t)> callback)
+{
+    _callbackProgress = callback;
+}
+
+void FileTransferDownLoadTask::RegisterTransInfo(const string &filepath, uint32_t filesize)
+{
+    file_path = filepath;
+    file_size = filesize;
+    IsRegister = true;
 }

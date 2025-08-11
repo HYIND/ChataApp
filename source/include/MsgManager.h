@@ -16,7 +16,8 @@ public:
     bool ProcessChatMsg(BaseNetWorkSession *session, string token, string ip, uint16_t port, json &js_src);
     // 拉取当前在线的用户
     bool SendOnlineUserMsg(BaseNetWorkSession *session, string token, string ip, uint16_t port);
-
+    // 拉取聊天记录
+    bool ProcessFetchRecord(BaseNetWorkSession *session, string token, json &js_src);
 private:
     // 转发私聊消息
     bool ForwardChatMsg(string srctoken, string goaltoken, json &js_src);

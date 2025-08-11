@@ -1,22 +1,7 @@
 #include "FileTransferUploadTask.h"
 
-std::string getFilenameFromPath(const std::string &filepath)
-{
-    // 处理 Windows 和 Unix 风格的路径分隔符
-    size_t pos1 = filepath.find_last_of('/');
-    size_t pos2 = filepath.find_last_of('\\');
-
-    size_t pos = (pos1 == std::string::npos) ? pos2 : ((pos2 == std::string::npos) ? pos1 : std::max(pos1, pos2));
-
-    if (pos != std::string::npos)
-    {
-        return filepath.substr(pos + 1);
-    }
-    return filepath;
-}
-
-FileTransferUploadTask::FileTransferUploadTask(const string &filepath, const string &taskid)
-    : FileTransferTask(filepath, taskid)
+FileTransferUploadTask::FileTransferUploadTask(const string &taskid, const string &filepath)
+    : FileTransferTask(taskid, filepath)
 {
     ParseFile();
 }
@@ -45,7 +30,8 @@ void FileTransferUploadTask::InterruptTrans(BaseNetWorkSession *session)
         js_error["result"] = 0;
 
         Buffer buf = js_error.dump();
-        session->AsyncSend(buf);
+        if (!session->AsyncSend(buf))
+            IsNetworkEnable = false;
 
         OccurInterrupt();
     }
@@ -60,7 +46,7 @@ bool FileTransferUploadTask::ParseFile()
     if (IsFileEnable)
     {
         file_size = file_io.GetSize();
-        suggest_chunksize = std::max((uint64_t)1, file_size / (uint64_t)20);
+        suggest_chunksize = GetSuggestChunsize(file_size);
     }
     else
     {
@@ -81,11 +67,18 @@ void FileTransferUploadTask::SendTransReq(BaseNetWorkSession *session)
     js["filesize"] = file_size;
 
     Buffer buf = js.dump();
-    session->AsyncSend(buf);
+    if (!session->AsyncSend(buf))
+        IsNetworkEnable = false;
 }
 
 void FileTransferUploadTask::AckTransReqResult(BaseNetWorkSession *session, const json &js)
 {
+    if (!ParseReqResult(js))
+    {
+        OccurError(session);
+        return;
+    }
+
     if (!ParseSuggestChunkSize(js))
     {
         OccurError(session);
@@ -96,6 +89,7 @@ void FileTransferUploadTask::AckTransReqResult(BaseNetWorkSession *session, cons
         OccurError(session);
         return;
     }
+    OccurProgressChange();
     SendNextChunkData(session);
 }
 
@@ -106,7 +100,18 @@ void FileTransferUploadTask::RecvChunkMapAndSendNextData(BaseNetWorkSession *ses
         OccurError(session);
         return;
     }
+    OccurProgressChange();
     SendNextChunkData(session);
+}
+
+bool FileTransferUploadTask::ParseReqResult(const json &js)
+{
+    if (js.contains("result") && js.at("result").is_number_unsigned())
+    {
+        uint32_t result = js["result"];
+        return result != 0;
+    }
+    return false;
 }
 
 bool FileTransferUploadTask::ParseSuggestChunkSize(const json &js)
@@ -153,7 +158,9 @@ bool FileTransferUploadTask::ParseChunkMap(const json &js)
             chunkmap.emplace_back(info);
         }
         if (parseresult)
-            chunk_map = chunkmap;
+        {
+            chunk_map = mergeChunks(chunkmap);
+        }
     }
     return parseresult;
 }
@@ -163,8 +170,9 @@ void FileTransferUploadTask::OccurError(BaseNetWorkSession *session)
     if (!IsError)
     {
         IsError = true;
+        if (IsNetworkEnable)
+            SendErrorInfo(session);
         OnError();
-        SendErrorInfo(session);
     }
 }
 
@@ -172,9 +180,9 @@ void FileTransferUploadTask::OccurFinish()
 {
     if (!IsFinished)
     {
+        OccurProgressChange();
         IsFinished = true;
         OnFinished();
-        ReleaseSource();
     }
 }
 
@@ -184,8 +192,18 @@ void FileTransferUploadTask::OccurInterrupt()
     {
         IsInterrupted = true;
         OnInterrupted();
-        ReleaseSource();
     }
+}
+
+void FileTransferUploadTask::OccurProgressChange()
+{
+    uint32_t progress = Progress();
+    OnProgress(progress);
+}
+
+uint32_t FileTransferUploadTask::Progress()
+{
+    return CountProgress(chunk_map, file_size);
 }
 
 void FileTransferUploadTask::SendNextChunkData(BaseNetWorkSession *session)
@@ -201,6 +219,7 @@ void FileTransferUploadTask::SendNextChunkData(BaseNetWorkSession *session)
         Buffer buf_data = js_success.dump();
         if (!session->AsyncSend(buf_data))
         {
+            IsNetworkEnable = false;
             OccurError(session);
             return;
         }
@@ -247,7 +266,15 @@ void FileTransferUploadTask::SendErrorInfo(BaseNetWorkSession *session)
     js_error["result"] = 0;
 
     Buffer buf = js_error.dump();
-    session->AsyncSend(buf);
+    try
+    {
+        if (!session->AsyncSend(buf))
+            IsNetworkEnable = false;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "SendErrorInfo error!" << e.what() << '\n';
+    }
 }
 
 void FileTransferUploadTask::RecvPeerError(const json &js)
@@ -309,6 +336,18 @@ void FileTransferUploadTask::OnInterrupted()
     }
 }
 
+void FileTransferUploadTask::OnProgress(uint32_t progress)
+{
+    try
+    {
+        if (_callbackProgress)
+            _callbackProgress(this, progress);
+    }
+    catch (const std::exception &e)
+    {
+    }
+}
+
 bool FileTransferUploadTask::StartSendFile(BaseNetWorkSession *session)
 {
     if (IsFileEnable)
@@ -319,16 +358,20 @@ bool FileTransferUploadTask::StartSendFile(BaseNetWorkSession *session)
 
 void FileTransferUploadTask::ProcessMsg(BaseNetWorkSession *session, const Buffer &buf)
 {
-    string str(buf.Byte(), buf.Length());
     json js;
     try
     {
-        js = json::parse(str);
+        js = json::parse(buf.Byte(), buf.Byte() + buf.Length());
     }
     catch (...)
     {
-        cout << fmt::format("json::parse error : {}\n", str);
+        cout << fmt::format("json::parse error : {}\n", string(buf.Byte(), buf.Length()));
     }
+    ProcessMsg(session, js);
+}
+
+void FileTransferUploadTask::ProcessMsg(BaseNetWorkSession *session, const json &js)
+{
     if (js.contains("taskid"))
     {
         string taskid = js.at("taskid");
@@ -352,7 +395,8 @@ void FileTransferUploadTask::ProcessMsg(BaseNetWorkSession *session, const Buffe
             js_reply["result"] = IsFinished ? 1 : 0;
 
             Buffer buf = js_reply.dump();
-            session->AsyncSend(buf);
+            if (!session->AsyncSend(buf))
+                IsNetworkEnable = false;
             return;
         }
 
@@ -403,4 +447,9 @@ void FileTransferUploadTask::BindFinishedCallBack(std::function<void(FileTransfe
 void FileTransferUploadTask::BindInterruptedCallBack(std::function<void(FileTransferUploadTask *)> callback)
 {
     _callbackInterrupted = callback;
+}
+
+void FileTransferUploadTask::BindProgressCallBack(std::function<void(FileTransferUploadTask *, uint32_t)> callback)
+{
+    _callbackProgress = callback;
 }

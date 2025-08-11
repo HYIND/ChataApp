@@ -21,8 +21,8 @@ void ConnectManager::callBackRecvMessage(BaseNetWorkSession *basesession, Buffer
 {
     CustomTcpSession *session = (CustomTcpSession *)basesession;
 
-    // std::cout << fmt::format("Server recvData:RemoteAddr={}:{}, data:{} \n",
-    //                          session->GetIPAddr(), session->GetPort(), string(recv->Byte(), recv->Length()));
+    // std::cout << fmt::format("Server recvData:RemoteAddr={}:{} \n",
+    //                          session->GetIPAddr(), session->GetPort());
 
     bool success = false;
     if (HandleMsg)
@@ -60,7 +60,7 @@ void ConnectManager::callBackCloseConnect(BaseNetWorkSession *session)
 
     );
 
-    SAFE_DELETE(session);
+    DeleteLater(session);
 }
 
 void ConnectManager::SetLoginUserManager(LoginUserManager *m)

@@ -80,11 +80,15 @@ long FileIOHandler::Read(char *buf, size_t bytesToRead)
     try
     {
         if (!CheckOpen())
+        {
+            mutex.Leave();
             return result;
+        }
 
         result = ::read(fd, (void *)buf, bytesToRead);
         if (result < 0)
         {
+            mutex.Leave();
             throw std::system_error(errno, std::system_category(), "Read failed");
         }
         offset += result;
@@ -186,7 +190,10 @@ long FileIOHandler::GetSize() const
     try
     {
         if (!CheckOpen())
+        {
+            mutex.Leave();
             return result;
+        }
 
         struct stat st;
         if (::fstat(fd, &st) == -1)
@@ -210,7 +217,10 @@ bool FileIOHandler::Truncate(off_t size)
     try
     {
         if (!CheckOpen())
+        {
+            mutex.Leave();
             return result;
+        }
         result = ::ftruncate(fd, size) == 0;
     }
     catch (const std::exception &e)
@@ -229,6 +239,31 @@ bool FileIOHandler::Exists(const std::string &path)
 bool FileIOHandler::Remove(const std::string &path)
 {
     return ::unlink(path.c_str()) == 0;
+}
+
+bool FileIOHandler::CreateFolder(const std::string &path)
+{
+    if (path.empty()) return false;
+
+    // 检查目录是否已存在
+    struct stat st;
+    if (stat(path.c_str(), &st) == 0) {
+        return S_ISDIR(st.st_mode); // 存在且是目录
+    }
+
+    // 递归创建目录
+    size_t pos = 0;
+    std::string dir;
+    while ((pos = path.find_first_of('/', pos + 1)) != std::string::npos) {
+        dir = path.substr(0, pos);
+        if (dir.empty()) continue; // 跳过根目录
+        if (mkdir(dir.c_str(), 0755) != 0 && errno != EEXIST) {
+            return false; // 创建失败
+        }
+    }
+    // 创建最后一层目录
+    return mkdir(path.c_str(), 0755) == 0 || errno == EEXIST;
+
 }
 
 bool FileIOHandler::CheckOpen() const

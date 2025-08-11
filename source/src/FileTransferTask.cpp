@@ -14,6 +14,38 @@ void FileTransferChunkData::FromBinary(const std::vector<uint8_t> &datas)
     memcpy(buf.Data(), datas.data(), datas.size());
 }
 
+std::string getFilenameFromPath(const std::string &filepath)
+{
+    // 处理 Windows 和 Unix 风格的路径分隔符
+    size_t pos1 = filepath.find_last_of('/');
+    size_t pos2 = filepath.find_last_of('\\');
+
+    size_t pos = (pos1 == std::string::npos) ? pos2 : ((pos2 == std::string::npos) ? pos1 : std::max(pos1, pos2));
+
+    if (pos != std::string::npos)
+    {
+        return filepath.substr(pos + 1);
+    }
+    return filepath;
+}
+
+uint64_t GetSuggestChunsize(uint64_t file_size)
+{
+    const uint64_t KB = 1024;
+    const uint64_t MB = KB * 1024;
+
+    const uint64_t minchunksize = 500 * KB;
+    const uint64_t maxchunksize = 2 * MB;
+
+    if (file_size <= minchunksize)
+        return max((uint64_t)1, file_size);
+
+    else
+    {
+        return min(maxchunksize, file_size / (uint64_t)20);
+    }
+}
+
 // 比较函数，用于排序
 bool compareChunk(const FileTransferChunkInfo &a, const FileTransferChunkInfo &b)
 {
@@ -101,7 +133,46 @@ std::vector<FileTransferChunkInfo> getUntransferredChunks(
     return untransferred;
 }
 
-FileTransferTask::FileTransferTask(const string &filepath, const string &taskid)
+uint32_t CountProgress(const std::vector<FileTransferChunkInfo> &chunks, uint64_t totalFileSize)
+{
+    if (chunks.empty())
+        return 0;
+
+    std::vector<FileTransferChunkInfo> sorted = chunks;
+    std::sort(sorted.begin(), sorted.end(), compareChunk);
+
+    std::vector<FileTransferChunkInfo> merged;
+    uint64_t current_left = sorted[0].range_left;
+    uint64_t current_right = sorted[0].range_right;
+
+    uint64_t hastrans = 0;
+
+    for (size_t i = 1; i < sorted.size(); ++i)
+    {
+        if (sorted[i].range_left <= current_right + 1)
+        {
+            // 重叠或连续，合并
+            current_right = std::max(current_right, sorted[i].range_right);
+        }
+        else
+        {
+            hastrans += (current_right - current_left + 1);
+            // 不连续，保存当前区间
+            current_left = sorted[i].range_left;
+            current_right = sorted[i].range_right;
+        }
+    }
+    hastrans += (current_right - current_left + 1);
+
+    uint32_t progress = (uint32_t)(((float)hastrans / (float)totalFileSize) * 100);
+
+    progress = std::max(progress, (uint32_t)0);
+    progress = std::min(progress, (uint32_t)100);
+
+    return progress;
+}
+
+FileTransferTask::FileTransferTask(const string &taskid, const string &filepath)
 {
     file_path = filepath;
     task_id = taskid;
@@ -114,4 +185,9 @@ FileTransferTask::~FileTransferTask()
 const FileIOHandler &FileTransferTask::FileHandler()
 {
     return file_io;
+}
+
+const string FileTransferTask::TaskId()
+{
+    return task_id;
 }

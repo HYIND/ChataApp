@@ -51,10 +51,10 @@
     "msg":string
 
     可选，如果是文件消息
-    "file_name": string,
-    "file_size": number,
-    "file_hash": string,
-    "upload_id": string
+    "filename": string,
+    "filesize": number,
+    "md5": string,
+    "fileid": string
 }
 返回
 {
@@ -73,6 +73,12 @@
     "port":number,
     "type":number
     "msg":string
+
+    可选，如果是文件消息
+    "filename": string,
+    "filesize": number,
+    "md5": string,
+    "fileid": string
 }
 
 5、文件传输部分:
@@ -88,9 +94,10 @@
 {
     "command": 5001
     "fileid": string,
+    "type":number,
     "result": number, //指示文件状态，如不可用、可用、不存在等
     "filesize":number,
-    "suggest_chunk_size": number, //建议分片大小
+    "suggest_chunksize": number, //建议分片大小
     "taskid": string
 }
 5.3文件传输逻辑
@@ -156,4 +163,34 @@
     "command":7080
     "taskid":string,
     "result":number
+}
+
+6.拉取聊天记录
+{
+    "command":1003
+    "token":string,
+    "goaltoken":string,
+}
+返回：
+{
+    "command":2004,
+    "messages":
+    [
+        {
+        "srctoken":string,
+        "goaltoken":string,
+        "name":string,
+        "time":number
+        "ip":string,
+        "port":number,
+        "type":number
+        "msg":string
+
+        可选，如果是文件消息
+        "filename": string,
+        "filesize": number,
+        "md5": string,
+        "fileid": string
+        }......
+    ]
 }

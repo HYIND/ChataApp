@@ -130,7 +130,7 @@ bool LoginUserManager::Logout(BaseNetWorkSession *session, string token, string 
     return success;
 }
 
-bool LoginUserManager::Verfiy(BaseNetWorkSession *session, string token, string ip, uint16_t port)
+bool LoginUserManager::Verfiy(BaseNetWorkSession *session, string token)
 {
     bool success = false;
 
@@ -140,7 +140,7 @@ bool LoginUserManager::Verfiy(BaseNetWorkSession *session, string token, string 
             for (auto it = array.begin(); it != array.end(); it++)
             {
                 User *u = *it;
-                if (u->session == session && u->token == token && u->port == port && u->ip == ip)
+                if (u->session == session && u->token == token)
                 {
                     success = true;
                     return;

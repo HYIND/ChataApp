@@ -4,23 +4,35 @@
 class FileTransferDownLoadTask : public FileTransferTask
 {
 public:
-    FileTransferDownLoadTask(const string &filepath, const string &taskid, uint64_t length = 0);
+    FileTransferDownLoadTask(const string &taskid, const string &filepath_dir = "");
     virtual ~FileTransferDownLoadTask();
 
 public:
-    void ProcessMsg(BaseNetWorkSession *session, const Buffer &buf);
-    void ReleaseSource();
-    void InterruptTrans(BaseNetWorkSession *session);
+    virtual void ProcessMsg(BaseNetWorkSession *session, const Buffer &buf);
+    virtual void ProcessMsg(BaseNetWorkSession *session, const json &js);
+    virtual void ReleaseSource();
+    virtual void InterruptTrans(BaseNetWorkSession *session);
 
     void BindErrorCallBack(std::function<void(FileTransferDownLoadTask *)> callback);
     void BindFinishedCallBack(std::function<void(FileTransferDownLoadTask *)> callback);
     void BindInterruptedCallBack(std::function<void(FileTransferDownLoadTask *)> callback);
+    void BindProgressCallBack(std::function<void(FileTransferDownLoadTask *, uint32_t)> callback);
 
+    void RegisterTransInfo(const string &filepath, uint32_t filesize); // 使用提前注册好的传输信息，而非被动接收对方的信息，在确认信息时执行校验行为
 protected:
     virtual void OnError();
     virtual void OnFinished();
     virtual void OnInterrupted();
+    virtual void OnProgress(uint32_t progress);
 
+    virtual void OccurError(BaseNetWorkSession *session);
+    virtual void OccurFinish();
+    virtual void OccurInterrupt();
+    virtual void OccurProgressChange();
+
+    virtual uint32_t Progress();
+
+    void RecvTransReq(BaseNetWorkSession *session, const json &js);
     void AckTransReq(BaseNetWorkSession *session, const json &js);
     void RecvChunkDataAndAck(BaseNetWorkSession *session, const json &js);
     void AckRecvFinished(BaseNetWorkSession *session, const json &js);
@@ -34,18 +46,15 @@ private:
     bool ParseChunkMap(const json &js);
     bool WriteToChunkFile();
     bool CheckFinish();
-    void OccurError(BaseNetWorkSession *session);
-    void OccurFinish();
-    void OccurInterrupt();
 
 protected:
     std::function<void(FileTransferDownLoadTask *)> _callbackError;
     std::function<void(FileTransferDownLoadTask *)> _callbackFinieshed;
     std::function<void(FileTransferDownLoadTask *)> _callbackInterrupted;
+    std::function<void(FileTransferDownLoadTask *, uint32_t)> _callbackProgress;
 
 private:
-    bool IsFileEnable = false;
     bool IsChunkFileEnable = false;
-    bool IsTransFinish = false;
     FileIOHandler chunkfile_io;
+    bool IsRegister = false;
 };
