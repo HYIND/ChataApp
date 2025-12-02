@@ -5,14 +5,20 @@
 #include <QQmlContext>
 #include "ModelManager.h"
 #include "RequestManager.h"
-#include "MsgManager.h"
+#include "3DModelViewerModel.h"
+#include <QQuickWindow>
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
 
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+
+    qmlRegisterType<OpenGLModelRenderItem>("OpenGLRendering", 1, 0, "OpenGLRenderItem");
+
     QQmlApplicationEngine engine;
     const QUrl url(QStringLiteral("qrc:/qml/Main.qml"));
+    // const QUrl url(QStringLiteral("qrc:/qml/3DModelViewer.qml"));
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreated,
@@ -22,6 +28,7 @@ int main(int argc, char *argv[])
                 QCoreApplication::exit(-1);
         },
         Qt::QueuedConnection);
+
 
     // 将模型实例暴露给QML
     engine.rootContext()->setContextProperty("chatitemlistmodel", CHATITEMMODEL);
@@ -55,7 +62,7 @@ int main(int argc, char *argv[])
 
     CONNECTMANAGER->Login("192.168.58.128",8888);
 
-    _sleep(500);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     if (CONNECTMANAGER->connectStatus() == ConnectStatus::connected)
     {

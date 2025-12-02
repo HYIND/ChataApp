@@ -24,7 +24,8 @@ public:
         Md5Role,
         FileIdRole,
         FileProgressRole,
-        FileStatusRole
+        FileStatusRole,
+        FilePathRole
     };
 
     explicit ChatSessionModel(QObject *parent = nullptr);

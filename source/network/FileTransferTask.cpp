@@ -194,3 +194,8 @@ const QString FileTransferTask::TaskId()
 {
     return task_id;
 }
+
+const QString FileTransferTask::FilePath()
+{
+    return file_path;
+}

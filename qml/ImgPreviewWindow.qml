@@ -39,6 +39,7 @@ Window {
             if (clickX < imgLeft || clickX > imgRight ||
                 clickY < imgTop || clickY > imgBottom) {
                 imagePreviewWindow.close()
+                imagePreviewWindow.destroy()
             }
         }
     }

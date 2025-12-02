@@ -277,6 +277,7 @@ void ChatItemListModel::fileTransFinished(const QString &fileid)
                 itemtoken = m_chatitems[i].token;
                 msg.fileprogress = 100;
                 msg.filestatus = FileStatus::Success;
+                msg.filepath = FILETRANSMANAGER->FindDownloadPathByFileId(fileid);
                 break;
             }
         }

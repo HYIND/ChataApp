@@ -42,7 +42,8 @@ public:
             {"filesizestr", filesizestr},
             {"md5",md5},
             {"fileid",fileid},
-            {"fileprogress",fileprogress}
+            {"fileprogress",fileprogress},
+            {"filepath",filepath}
         };
     }
 
@@ -61,6 +62,7 @@ public:
     QString fileid;
     uint32_t fileprogress=0;
     FileStatus filestatus=FileStatus::Stop;
+    QString filepath;
 };
 
 class ChatItemData {

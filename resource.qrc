@@ -10,5 +10,6 @@
         <file>qml/ImagePickerButton.qml</file>
         <file>qml/FilePickerButton.qml</file>
         <file>qml/ImgPreviewWindow.qml</file>
+        <file>qml/3DModelViewer.qml</file>
     </qresource>
 </RCC>

@@ -112,6 +112,7 @@ Item {
                             function loadBase64(base64Data) {
                                 return "data:image/png;base64," + base64Data
                             }
+
                             property var previewWindow: null
                             MouseArea {
                                 anchors.fill: parent
@@ -129,6 +130,7 @@ Item {
                                             imgPreview.previewWindow = win
                                             imgPreview.previewWindow.onClosing.connect(
                                                         function () {
+                                                            imgPreview.previewWindow.destroy()
                                                             imgPreview.previewWindow = null
                                                         })
                                             imgPreview.previewWindow.show()
@@ -418,6 +420,58 @@ Item {
                                                 sourceComponent: model.filestatus === 0 ? startbtn : model.filestatus === 1 ? stopbtn : model.filestatus === 3 ? errorbtn : null
                                                 active: true
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        property var modelviewWindow: null
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            propagateComposedEvents: true
+
+                            function isSupportModelFile(filePath) {
+                                var imageExtensions = ['.obj']
+                                var lowerPath = String(filePath).toLowerCase()
+                                return imageExtensions.some(ext => lowerPath.endsWith(ext))
+                            }
+
+                            onClicked: {
+                                if (model.fileprogress<100){
+                                    mouse.accepted = false
+                                    if(model.filestatus === 0 || model.filestatus === 3)
+                                        sessionmodel.startTrans(model.fileid);
+                                    else if (model.filestatus === 1)
+                                        sessionmodel.stopTrans(model.fileid);
+                                    return false
+                                }
+                                else {
+                                    if(isSupportModelFile(model.filename))
+                                    {
+                                        if (!messagebubble_file.modelviewWindow) {
+                                            var component = Qt.createComponent(
+                                                        "3DModelViewer.qml")
+                                            if (component.status === Component.Ready) {
+                                                const validSource = String(
+                                                                      model.filepath)
+                                                var win = component.createObject(
+                                                            root, {
+                                                                "filepath": model.filepath
+                                                            })
+                                                messagebubble_file.modelviewWindow = win
+                                                messagebubble_file.modelviewWindow.onClosing.connect(
+                                                            function () {
+                                                                messagebubble_file.modelviewWindow.destroy()
+                                                                messagebubble_file.modelviewWindow = null
+                                                            })
+                                                messagebubble_file.modelviewWindow.show()
+                                            }
+                                        } else {
+                                            // 如果窗口已存在，则激活它
+                                            messagebubble_file.modelviewWindow.requestActivate()
                                         }
                                     }
                                 }
