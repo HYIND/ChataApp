@@ -1,6 +1,7 @@
 #include "FileTransManager.h"
 #include "FileRecordStore.h"
 #include "LoginUserManager.h"
+#include "NetWorkHelper.h"
 
 FileTransTaskContent::FileTransTaskContent(const string &id, FileTransferTask *t, BaseNetWorkSession *s)
 {
@@ -25,7 +26,7 @@ FileTransManager *FileTransManager::Instance()
     return instance;
 }
 
-bool FileTransManager::ProcessMsg(BaseNetWorkSession *session, const string &ip, const uint16_t port, const json &js)
+bool FileTransManager::ProcessMsg(BaseNetWorkSession *session, const string &ip, const uint16_t port, const json &js, Buffer &buf)
 {
     int command = js.at("command");
     switch (command)
@@ -35,13 +36,13 @@ bool FileTransManager::ProcessMsg(BaseNetWorkSession *session, const string &ip,
         return true;
         break;
     default:
-        return DistributeMsg(session, js);
+        return DistributeMsg(session, js, buf);
         break;
     }
     return false;
 }
 
-bool FileTransManager::DistributeMsg(BaseNetWorkSession *session, const json &js)
+bool FileTransManager::DistributeMsg(BaseNetWorkSession *session, const json &js, Buffer &buf)
 {
     if (!js.contains("taskid") || !js.at("taskid").is_string())
         return false;
@@ -51,7 +52,7 @@ bool FileTransManager::DistributeMsg(BaseNetWorkSession *session, const json &js
     if (!m_tasks.Find(taskid, content))
         return false;
 
-    content->task->ProcessMsg(session, js);
+    content->task->ProcessMsg(session, js, buf);
 
     return true;
 }
@@ -102,9 +103,9 @@ void FileTransManager::AckTaskReq(BaseNetWorkSession *session, const json &js)
         js_reply["suggest_chunksize"] = 0;
         js_reply["taskid"] = taskid;
     }
-    Buffer buf_data = js_reply.dump();
-    session->AsyncSend(buf_data);
-    
+
+    NetWorkHelper::SendMessagePackage(session, &js_reply);
+
     if (type == 2)
     {
         if (record.status == FileStoreStatus::COMPLETED)

@@ -8,8 +8,7 @@ public:
     virtual ~FileTransferDownLoadTask();
 
 public:
-    virtual void ProcessMsg(BaseNetWorkSession *session, const Buffer &buf);
-    virtual void ProcessMsg(BaseNetWorkSession *session, const json &js);
+    virtual void ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf);
     virtual void ReleaseSource();
     virtual void InterruptTrans(BaseNetWorkSession *session);
 
@@ -34,7 +33,7 @@ protected:
 
     void RecvTransReq(BaseNetWorkSession *session, const json &js);
     void AckTransReq(BaseNetWorkSession *session, const json &js);
-    void RecvChunkDataAndAck(BaseNetWorkSession *session, const json &js);
+    void RecvChunkDataAndAck(BaseNetWorkSession *session, const json &js, Buffer &buf);
     void AckRecvFinished(BaseNetWorkSession *session, const json &js);
     void SendErrorInfo(BaseNetWorkSession *session);
     void RecvPeerError(const json &js);

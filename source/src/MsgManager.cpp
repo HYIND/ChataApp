@@ -2,6 +2,8 @@
 #include "MessageRecordStore.h"
 #include "FileTransManager.h"
 #include "FileRecordStore.h"
+#include "MessagePackage.h"
+#include "NetWorkHelper.h"
 
 int64_t GetTimeStampSecond()
 {
@@ -13,36 +15,36 @@ int64_t GetTimeStampSecond()
 
 bool MsgManager::ProcessMsg(BaseNetWorkSession *session, string ip, uint16_t port, Buffer *buf)
 {
-    string str(buf->Byte(), buf->Length());
-    json js;
-    try
-    {
-        js = json::parse(str);
-    }
-    catch (...)
-    {
-        cout << fmt::format("json::parse error : {}\n", str);
-    }
-    if (!js.contains("command"))
+    MessagePackage package;
+    if (!AnalysisMessagePackageFromBuffer(buf, &package))
         return false;
-    int command = js.at("command");
+
+    if (!package.jsonenable)
+        return false;
+
+    json &js_src = package.nlmjson;
+    Buffer &buf_src = package.bufferdata;
+
+    if (!js_src.contains("command"))
+        return false;
+    int command = js_src.at("command");
 
     if (command == 7000 || command == 7001 || command == 7010 || command == 7080 || command == 7070 ||
         command == 8000 || command == 8001 || command == 8010 || command == 4001)
     {
-        FILETRANSMANAGER->ProcessMsg(session, ip, port, js);
+        FILETRANSMANAGER->ProcessMsg(session, ip, port, js_src, buf_src);
     }
 
-    if (!js.contains("token"))
+    if (!js_src.contains("token"))
         return false;
-    string token = js["token"];
+    string token = js_src["token"];
 
     bool success = false;
     if (HandleLoginUser)
         success = HandleLoginUser->Verfiy(session, token);
     if (success)
     {
-        if (js.contains("command"))
+        if (js_src.contains("command"))
         {
             if (command == 1001)
             {
@@ -50,18 +52,18 @@ bool MsgManager::ProcessMsg(BaseNetWorkSession *session, string ip, uint16_t por
             }
             if (command == 1002)
             {
-                ProcessChatMsg(session, token, ip, port, js);
+                ProcessChatMsg(session, token, ip, port, js_src, buf_src);
             }
             if (command == 1003)
             {
-                ProcessFetchRecord(session, token, js);
+                ProcessFetchRecord(session, token, js_src, buf_src);
             }
         }
     }
     return success;
 }
 
-bool MsgManager::ProcessChatMsg(BaseNetWorkSession *session, string token, string ip, uint16_t port, json &js_src)
+bool MsgManager::ProcessChatMsg(BaseNetWorkSession *session, string token, string ip, uint16_t port, json &js_src, Buffer &buf)
 {
     if (!js_src.contains("token"))
     {
@@ -80,12 +82,12 @@ bool MsgManager::ProcessChatMsg(BaseNetWorkSession *session, string token, strin
     string goaltoken = js_src["goaltoken"];
 
     if (HandleLoginUser->IsPublicChat(goaltoken))
-        return BroadCastPublicChatMsg(srctoken, js_src);
+        return BroadCastPublicChatMsg(srctoken, js_src, buf);
     else
-        return ForwardChatMsg(srctoken, goaltoken, js_src);
+        return ForwardChatMsg(srctoken, goaltoken, js_src, buf);
 }
 
-bool MsgManager::BroadCastPublicChatMsg(string token, json &js_src)
+bool MsgManager::BroadCastPublicChatMsg(string token, json &js_src, Buffer &buf)
 {
     if (!js_src.contains("msg"))
         return false;
@@ -110,6 +112,9 @@ bool MsgManager::BroadCastPublicChatMsg(string token, json &js_src)
     js["port"] = sender->port;
     js["type"] = int(type);
     js["msg"] = msg;
+
+    if (type == MsgType::picture && buf.Length() > 0)
+        msg = string(buf.Byte(), buf.Length());
 
     if (type == MsgType::file)
     {
@@ -160,14 +165,13 @@ bool MsgManager::BroadCastPublicChatMsg(string token, json &js_src)
             if(HandleLoginUser->IsPublicChat(user->token))
                 continue;
 
-            Buffer buf = js.dump();
-            user->session->AsyncSend(buf);
+            NetWorkHelper::SendMessagePackage(user->session, &js,&buf);
         } });
 
     return true;
 }
 
-bool MsgManager::ForwardChatMsg(string srctoken, string goaltoken, json &js_src)
+bool MsgManager::ForwardChatMsg(string srctoken, string goaltoken, json &js_src, Buffer &buf_src)
 {
     if (!js_src.contains("msg"))
         return false;
@@ -191,6 +195,9 @@ bool MsgManager::ForwardChatMsg(string srctoken, string goaltoken, json &js_src)
     js["port"] = sender->port;
     js["type"] = int(type);
     js["msg"] = msg;
+
+    if (type == MsgType::picture && buf_src.Length() > 0)
+        msg = string(buf_src.Byte(), buf_src.Length());
 
     if (type == MsgType::file)
     {
@@ -229,9 +236,8 @@ bool MsgManager::ForwardChatMsg(string srctoken, string goaltoken, json &js_src)
                 .msg = msg});
     }
 
-    Buffer buf = js.dump();
     for (auto user : {sender, recver})
-        user->session->AsyncSend(buf);
+        NetWorkHelper::SendMessagePackage(user->session, &js, &buf_src);
 
     return true;
 }
@@ -263,13 +269,12 @@ bool MsgManager::SendOnlineUserMsg(BaseNetWorkSession *session, string token, st
 
     js["users"] = js_users;
 
-    Buffer buf = js.dump();
-    session->AsyncSend(buf);
+    NetWorkHelper::SendMessagePackage(session, &js);
 
     return true;
 }
 
-bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, string token, json &js_src)
+bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, string token, json &js_src, Buffer &buf_src)
 {
     if (!js_src.contains("goaltoken"))
         return false;
@@ -282,6 +287,8 @@ bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, string token, j
     json js;
     js["command"] = 2004;
 
+    Buffer buf;
+
     json js_messages = json::array();
     for (auto &msgrecord : MsgRecords)
     {
@@ -293,7 +300,17 @@ bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, string token, j
         js_record["ip"] = msgrecord.ip;
         js_record["port"] = msgrecord.port;
         js_record["type"] = int(msgrecord.type);
-        js_record["msg"] = msgrecord.msg;
+        js_record["msg"] = "";
+
+        if (msgrecord.type == MsgType::picture)
+        {
+            js_record["bufferlen"] = msgrecord.msg.length();
+            buf.Write(msgrecord.msg.data(), msgrecord.msg.length());
+        }
+        else
+        {
+            js_record["msg"] = msgrecord.msg;
+        }
 
         if (msgrecord.type == MsgType::file)
         {
@@ -307,8 +324,7 @@ bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, string token, j
     }
     js["messages"] = js_messages;
 
-    Buffer buf = js.dump();
-    session->AsyncSend(buf);
+    NetWorkHelper::SendMessagePackage(session, &js, &buf);
 
     return true;
 }

@@ -1,4 +1,5 @@
 #include "FileTransferDownLoadTask.h"
+#include "NetWorkHelper.h"
 
 #define enabledisplay 0
 
@@ -151,8 +152,7 @@ void FileTransferDownLoadTask::InterruptTrans(BaseNetWorkSession *session)
         js_error["taskid"] = task_id;
         js_error["result"] = 0;
 
-        Buffer buf = js_error.dump();
-        if (!session->AsyncSend(buf))
+        if (!NetWorkHelper::SendMessagePackage(session, &js_error))
             IsNetworkEnable = false;
 
         OccurInterrupt();
@@ -181,7 +181,7 @@ bool FileTransferDownLoadTask::WriteToChunkFile()
     }
     js_chunkfile["chunk_map"] = js_chunkmap;
 
-    Buffer buf = js_chunkfile.dump();
+    Buffer buf(js_chunkfile.dump());
 
     chunkfile_io.Seek(FileIOHandler::SeekOrigin::BEGIN);
     long writecount = chunkfile_io.Write(buf);
@@ -359,8 +359,7 @@ void FileTransferDownLoadTask::RecvTransReq(BaseNetWorkSession *session, const j
 
     js_reply["chunk_map"] = js_chunkmap;
 
-    Buffer buf = js_reply.dump();
-    if (!session->AsyncSend(buf))
+    if (!NetWorkHelper::SendMessagePackage(session, &js_reply))
     {
         IsNetworkEnable = false;
         OccurError(session);
@@ -414,8 +413,7 @@ void FileTransferDownLoadTask::AckTransReq(BaseNetWorkSession *session, const js
         js_reply["chunk_map"] = js_chunkmap;
     }
 
-    Buffer buf = js_reply.dump();
-    if (!session->AsyncSend(buf))
+    if (!NetWorkHelper::SendMessagePackage(session, &js_reply))
     {
         IsNetworkEnable = false;
         OccurError(session);
@@ -425,13 +423,13 @@ void FileTransferDownLoadTask::AckTransReq(BaseNetWorkSession *session, const js
         OccurProgressChange();
 }
 
-void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, const json &js)
+void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, const json &js, Buffer &buf)
 {
     bool error = false;
     if (!js.contains("chunk_size") || !js.at("chunk_size").is_number_unsigned())
         error = true;
-    if (!js.contains("data") || !js.at("data").is_object())
-        error = true;
+    // if (!js.contains("data") || !js.at("data").is_object())
+    //     error = true;
     if (!js.contains("range") || !js.at("range").is_array())
     {
         if (!js.at("range").at(0).is_number_unsigned() || js.at("range").at(1).is_number_unsigned())
@@ -451,21 +449,30 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
     chunkdata.range_left = js.at("range").at(0);
     chunkdata.range_right = js.at("range").at(1);
 
-    vector<uint8_t> bytes;
-    error = !ExtractBinaryJson(js["data"], bytes);
-    if (error)
-    {
-        OccurError(session);
-        return;
-    }
-    chunkdata.FromBinary(bytes);
+    // vector<uint8_t> bytes;
+    // error = !ExtractBinaryJson(js["data"], bytes);
+    // if (error)
+    // {
+    //     OccurError(session);
+    //     return;
+    // }
+    // chunkdata.FromBinary(bytes);
 
-    if (chunkdata.buf.Length() < chunksize)
+    // if (chunkdata.buf.Length() < chunksize)
+    // {
+    //     error = true;
+    //     OccurError(session);
+    //     return;
+    // }
+
+    if (buf.Remaind() < chunksize)
     {
         error = true;
         OccurError(session);
         return;
     }
+
+    chunkdata.buf.Append(buf, chunksize);
 
     if (IsFileEnable)
     {
@@ -527,8 +534,7 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
 
         js_reply["chunk_map"] = js_chunkmap;
     }
-    Buffer buf = js_reply.dump();
-    if (!session->AsyncSend(buf))
+    if (!NetWorkHelper::SendMessagePackage(session, &js_reply))
     {
         IsNetworkEnable = false;
         OccurError(session);
@@ -557,8 +563,7 @@ void FileTransferDownLoadTask::AckRecvFinished(BaseNetWorkSession *session, cons
         js_reply["taskid"] = task_id;
         js_reply["result"] = IsFinished ? 1 : 0;
 
-        Buffer buf = js_reply.dump();
-        if (!session->AsyncSend(buf))
+        if (!NetWorkHelper::SendMessagePackage(session, &js_reply))
             IsNetworkEnable = false;
     }
     else
@@ -574,10 +579,9 @@ void FileTransferDownLoadTask::SendErrorInfo(BaseNetWorkSession *session)
     js_error["taskid"] = task_id;
     js_error["result"] = 0;
 
-    Buffer buf = js_error.dump();
     try
     {
-        if (!session->AsyncSend(buf))
+        if (!NetWorkHelper::SendMessagePackage(session, &js_error))
             IsNetworkEnable = false;
     }
     catch (const std::exception &e)
@@ -654,21 +658,7 @@ void FileTransferDownLoadTask::OnProgress(uint32_t progress)
     }
 }
 
-void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const Buffer &buf)
-{
-    json js;
-    try
-    {
-        js = json::parse(buf.Byte(), buf.Byte() + buf.Length());
-    }
-    catch (...)
-    {
-        cout << fmt::format("json::parse error : {}\n", string(buf.Byte(), buf.Length()));
-    }
-    ProcessMsg(session, js);
-}
-
-void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const json &js)
+void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf)
 {
     if (js.contains("taskid"))
     {
@@ -692,8 +682,7 @@ void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const jso
             js_success["taskid"] = task_id;
             js_success["result"] = 1;
 
-            Buffer buf_data = js_success.dump();
-            if (!session->AsyncSend(buf_data))
+            if (!NetWorkHelper::SendMessagePackage(session, &js_success))
             {
                 IsNetworkEnable = false;
                 OccurError(session);
@@ -723,7 +712,7 @@ void FileTransferDownLoadTask::ProcessMsg(BaseNetWorkSession *session, const jso
         }
         if (command == 7001)
         {
-            RecvChunkDataAndAck(session, js);
+            RecvChunkDataAndAck(session, js, buf);
         }
         if (command == 7010)
         {

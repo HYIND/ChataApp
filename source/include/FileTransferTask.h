@@ -38,8 +38,7 @@ public:
     const string TaskId();
 
 public:
-    virtual void ProcessMsg(BaseNetWorkSession *session, const Buffer &buf) = 0;
-    virtual void ProcessMsg(BaseNetWorkSession *session, const json &js) = 0;
+    virtual void ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf) = 0;
     virtual void ReleaseSource() = 0;
     virtual void InterruptTrans(BaseNetWorkSession *session) = 0;
 

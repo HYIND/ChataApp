@@ -11,8 +11,7 @@ public:
 public:
     bool StartSendFile(BaseNetWorkSession *session);
 
-    virtual void ProcessMsg(BaseNetWorkSession *session, const Buffer &buf);
-    virtual void ProcessMsg(BaseNetWorkSession *session, const json &js);
+    virtual void ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf);
     virtual void ReleaseSource();
     virtual void InterruptTrans(BaseNetWorkSession *session);
 

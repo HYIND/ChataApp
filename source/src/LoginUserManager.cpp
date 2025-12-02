@@ -1,4 +1,5 @@
 #include "LoginUserManager.h"
+#include "NetWorkHelper.h"
 
 std::string GenerateSimpleUuid()
 {
@@ -163,8 +164,7 @@ bool LoginUserManager::SendLoginInfo(User *u)
     js["ip"] = u->ip;
     js["port"] = u->port;
 
-    Buffer buf = js.dump();
-    return u->session->AsyncSend(buf);
+    return NetWorkHelper::SendMessagePackage(u->session, &js);
 }
 
 SafeArray<User *> &LoginUserManager::GetOnlineUsers()

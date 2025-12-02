@@ -11,7 +11,7 @@ inline std::string GetMessageRecordDirName()
 }
 
 inline std::string GetSessionFilePath(const std::string &srctoken,
-                               const std::string &goaltoken)
+                                      const std::string &goaltoken)
 {
     string filename;
     if (LoginUserManager::IsPublicChat(goaltoken))
@@ -147,6 +147,9 @@ bool MessageRecordStore::StoreMsg(const MsgRecord &msg)
     bool result = false;
     if (msg.srctoken == "" || msg.goaltoken == "")
         return result;
+
+    if (!FileIOHandler::Exists(GetMessageRecordDirName()))
+        FileIOHandler::CreateFolder(GetMessageRecordDirName());
 
     string filepath = GetSessionFilePath(msg.srctoken, msg.goaltoken);
 

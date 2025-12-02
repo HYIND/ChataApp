@@ -1,4 +1,5 @@
 #include "FileTransferUploadTask.h"
+#include "NetWorkHelper.h"
 
 FileTransferUploadTask::FileTransferUploadTask(const string &taskid, const string &filepath)
     : FileTransferTask(taskid, filepath)
@@ -29,8 +30,7 @@ void FileTransferUploadTask::InterruptTrans(BaseNetWorkSession *session)
         js_error["taskid"] = task_id;
         js_error["result"] = 0;
 
-        Buffer buf = js_error.dump();
-        if (!session->AsyncSend(buf))
+        if (!NetWorkHelper::SendMessagePackage(session, &js_error))
             IsNetworkEnable = false;
 
         OccurInterrupt();
@@ -66,8 +66,7 @@ void FileTransferUploadTask::SendTransReq(BaseNetWorkSession *session)
     js["filename"] = getFilenameFromPath(file_path);
     js["filesize"] = file_size;
 
-    Buffer buf = js.dump();
-    if (!session->AsyncSend(buf))
+    if (!NetWorkHelper::SendMessagePackage(session, &js))
         IsNetworkEnable = false;
 }
 
@@ -216,8 +215,7 @@ void FileTransferUploadTask::SendNextChunkData(BaseNetWorkSession *session)
         js_success["taskid"] = task_id;
         js_success["result"] = 1;
 
-        Buffer buf_data = js_success.dump();
-        if (!session->AsyncSend(buf_data))
+        if (!NetWorkHelper::SendMessagePackage(session, &js_success))
         {
             IsNetworkEnable = false;
             OccurError(session);
@@ -247,10 +245,9 @@ void FileTransferUploadTask::SendNextChunkData(BaseNetWorkSession *session)
         js_range.emplace_back(chunkdata.range_right);
         js_data["range"] = js_range;
 
-        js_data["data"] = json::binary(chunkdata.ToBinary());
+        // js_data["data"] = json::binary(chunkdata.ToBinary());
 
-        Buffer buf_data = js_data.dump();
-        if (!session->AsyncSend(buf_data))
+        if (!NetWorkHelper::SendMessagePackage(session, &js_data, &chunkdata.buf))
         {
             OccurError(session);
             return;
@@ -265,10 +262,9 @@ void FileTransferUploadTask::SendErrorInfo(BaseNetWorkSession *session)
     js_error["taskid"] = task_id;
     js_error["result"] = 0;
 
-    Buffer buf = js_error.dump();
     try
     {
-        if (!session->AsyncSend(buf))
+        if (!NetWorkHelper::SendMessagePackage(session, &js_error))
             IsNetworkEnable = false;
     }
     catch (const std::exception &e)
@@ -356,21 +352,7 @@ bool FileTransferUploadTask::StartSendFile(BaseNetWorkSession *session)
     return IsFileEnable;
 }
 
-void FileTransferUploadTask::ProcessMsg(BaseNetWorkSession *session, const Buffer &buf)
-{
-    json js;
-    try
-    {
-        js = json::parse(buf.Byte(), buf.Byte() + buf.Length());
-    }
-    catch (...)
-    {
-        cout << fmt::format("json::parse error : {}\n", string(buf.Byte(), buf.Length()));
-    }
-    ProcessMsg(session, js);
-}
-
-void FileTransferUploadTask::ProcessMsg(BaseNetWorkSession *session, const json &js)
+void FileTransferUploadTask::ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf)
 {
     if (js.contains("taskid"))
     {
@@ -394,8 +376,7 @@ void FileTransferUploadTask::ProcessMsg(BaseNetWorkSession *session, const json 
             js_reply["taskid"] = task_id;
             js_reply["result"] = IsFinished ? 1 : 0;
 
-            Buffer buf = js_reply.dump();
-            if (!session->AsyncSend(buf))
+            if (!NetWorkHelper::SendMessagePackage(session, &js_reply))
                 IsNetworkEnable = false;
             return;
         }

@@ -24,8 +24,8 @@ public:
 
 public:
     // 处理消息的入口
-    bool ProcessMsg(BaseNetWorkSession *session, const string &ip, const uint16_t port, const json &js);
-    bool DistributeMsg(BaseNetWorkSession *session, const json &js);
+    bool ProcessMsg(BaseNetWorkSession *session, const string &ip, const uint16_t port, const json &js, Buffer &buf);
+    bool DistributeMsg(BaseNetWorkSession *session, const json &js, Buffer &buf);
 
 protected:
     void AckTaskReq(BaseNetWorkSession *session, const json &js);
