@@ -441,12 +441,12 @@ Item {
 
                             onClicked: {
                                 if (model.fileprogress<100){
-                                    mouse.accepted = false
                                     if(model.filestatus === 0 || model.filestatus === 3)
                                         sessionmodel.startTrans(model.fileid);
                                     else if (model.filestatus === 1)
                                         sessionmodel.stopTrans(model.fileid);
-                                    return false
+                                    else
+                                        mouse.accepted = false
                                 }
                                 else {
                                     if(isSupportModelFile(model.filename))
