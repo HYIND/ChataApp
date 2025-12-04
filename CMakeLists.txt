@@ -35,6 +35,7 @@ set(APP_SOURCES
     source/network/FileTransferDownLoadTask.cpp
     source/network/FileTransferUpLoadTask.cpp
     source/network/FileIOHandler.cpp
+    source/network/CRC32Helper.cpp
 )
 
 set(APP_INCLUDES
@@ -61,6 +62,7 @@ set(APP_INCLUDES
     source/network/FileTransferUpLoadTask.h
     source/network/FileIOHandler.h
     source/network/SafeStl.h
+    source/network/CRC32Helper.h
 )
 
 qt_add_executable(appchat_qml_client

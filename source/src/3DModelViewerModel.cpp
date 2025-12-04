@@ -559,7 +559,6 @@ void OpenGLRenderer::renderScene()
     m_shaderProgram->setUniformValue("projection", m_projection);
     m_shaderProgram->setUniformValue("view",  m_view);
 
-
     // 设置光照参数
     QVector3D lightPos(30.0f, 30.0f, 30.0f);      // 光源位置
     QVector3D lightColor(1.0f, 1.0f, 1.0f);    // 白光
