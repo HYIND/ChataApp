@@ -143,7 +143,7 @@ bool FileTransManager::AddUploadTask(const string &fileid, const string &taskid,
     return result;
 }
 
-bool FileTransManager::AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, uint32_t filesize, BaseNetWorkSession *session)
+bool FileTransManager::AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, uint64_t filesize, BaseNetWorkSession *session)
 {
     FileTransTaskContent *content = nullptr;
     if (m_tasks.Find(taskid, content))

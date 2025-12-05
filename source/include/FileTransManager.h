@@ -46,7 +46,7 @@ public:
 private:
     FileTransManager();
     bool AddUploadTask(const string &fileid, const string &taskid, const string &filepath, BaseNetWorkSession *session);
-    bool AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, uint32_t filesize, BaseNetWorkSession *session);
+    bool AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, uint64_t filesize, BaseNetWorkSession *session);
     void DeleteTask(const string &taskid);
 
 private:

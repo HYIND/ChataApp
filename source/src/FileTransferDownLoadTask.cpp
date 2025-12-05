@@ -477,13 +477,25 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
     if (IsFileEnable)
     {
         file_io.Seek(FileIOHandler::SeekOrigin::BEGIN, chunkdata.range_left);
-        long writecount = file_io.Write(chunkdata.buf.Byte(), chunksize);
-        if (writecount != chunksize)
+        long truthwritecount = file_io.Write(chunkdata.buf.Byte(), chunksize);
+        if (truthwritecount < 0)
+        {
             error = true;
+            OccurError(session);
+            return;
+        }
+        else
+        {
+            if (truthwritecount > chunksize)
+            {
+                error = true;
+                OccurError(session);
+            }
+        }
 
         if (!error)
         {
-            chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_right);
+            chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_left + truthwritecount);
             chunk_map = mergeChunks(chunk_map);
             displayTransferProgress(file_size, chunk_map);
         }
@@ -747,7 +759,7 @@ void FileTransferDownLoadTask::BindProgressCallBack(std::function<void(FileTrans
     _callbackProgress = callback;
 }
 
-void FileTransferDownLoadTask::RegisterTransInfo(const string &filepath, uint32_t filesize)
+void FileTransferDownLoadTask::RegisterTransInfo(const string &filepath, uint64_t filesize)
 {
     file_path = filepath;
     file_size = filesize;
