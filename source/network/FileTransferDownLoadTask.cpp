@@ -466,16 +466,28 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 	if (IsFileEnable)
 	{
 		file_io.Seek(chunkdata.range_left);
-		long writecount = file_io.Write(chunkdata.buf.Byte(), chunksize);
-		if (writecount != chunksize)
-			error = true;
+        long truthwritecount = file_io.Write(chunkdata.buf.Byte(), chunksize);
+        if (truthwritecount < 0)
+        {
+            error = true;
+            OccurError();
+            return;
+        }
+        else
+        {
+            if (truthwritecount > chunksize)
+            {
+                error = true;
+                OccurError();
+            }
+        }
 
 		if (!error)
 		{
-			chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_right);
-			chunk_map = mergeChunks(chunk_map);
+            chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_left + truthwritecount);
+            chunk_map = mergeChunks(chunk_map);
 			// displayTransferProgress(file_size, chunk_map);
-		}
+        }
 	}
 	else
 	{
@@ -723,7 +735,7 @@ void FileTransferDownLoadTask::BindProgressCallBack(std::function<void(FileTrans
 	_callbackProgress = callback;
 }
 
-void FileTransferDownLoadTask::RegisterTransInfo(const QString& filepath, uint32_t filesize)
+void FileTransferDownLoadTask::RegisterTransInfo(const QString& filepath, uint64_t filesize)
 {
 	file_path = filepath;
 	file_size = filesize;

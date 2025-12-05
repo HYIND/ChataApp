@@ -185,7 +185,7 @@ bool FileTransManager::AddUploadTask(const QString& fileid, const QString& taski
 	return result;
 }
 
-bool FileTransManager::AddDownloadTask(const QString& fileid, const QString& taskid, const QString& filepath, uint32_t filesize, const QString& md5)
+bool FileTransManager::AddDownloadTask(const QString& fileid, const QString& taskid, const QString& filepath, uint64_t filesize, const QString& md5)
 {
 	FileTransTaskContent* content = nullptr;
 	if (FindTaskByFileId(fileid, content))
