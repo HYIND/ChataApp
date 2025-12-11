@@ -27,7 +27,6 @@ void CriticalSectionLock::Enter()
 void CriticalSectionLock::Leave()
 {
     pthread_mutex_unlock(&_mutex);
-    return false;
 }
 
 #elif defined(_WIN32)
@@ -54,3 +53,12 @@ void CriticalSectionLock::Leave() {
 
 #endif
 
+void CriticalSectionLock::lock()
+{
+    Enter();
+}
+
+void CriticalSectionLock::unlock()
+{
+    Leave();
+}

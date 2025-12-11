@@ -94,16 +94,21 @@ bool TCPClient::OnConnectClose()
     return true;
 }
 
-bool TCPClient::Send(const Buffer &buffer)
+bool TCPClient::Send(Buffer &buffer)
 {
     try
     {
         if (!buffer.Data() || buffer.Length() <= 0)
             return true;
-        bool result = BaseCon->write(buffer.Byte(),buffer.Length())!=0;
-        if(result)
-            BaseCon->flush();
-        return result;
+        while(buffer.Remaind()>0)
+        {
+            qint64 sendcount = BaseCon->write(buffer.Byte()+buffer.Postion(),buffer.Remaind());
+            if(sendcount<=0)
+                return false;
+            buffer.Seek(buffer.Postion()+sendcount);
+        }
+        BaseCon->flush();
+        return true;
     }
     catch (const std::exception &e)
     {

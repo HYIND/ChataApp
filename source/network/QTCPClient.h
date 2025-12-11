@@ -27,7 +27,7 @@ public:
     virtual bool OnRecvBuffer(Buffer *buffer);
     virtual bool OnConnectClose();
 
-    virtual bool Send(const Buffer &buffer);
+    virtual bool Send(Buffer &buffer);
 
     QTcpSocket *GetBaseCon();
 
