@@ -3,6 +3,7 @@
 #include "Helper/strHelper.h"
 #include "Helper/Buffer.h"
 #include <map>
+#include <vector>
 
 #define WS_ERROR_INVALID_HANDSHAKE_PARAMS 10070
 #define WS_ERROR_INVALID_HANDSHAKE_FRAME 10071
