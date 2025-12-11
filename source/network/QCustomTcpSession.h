@@ -3,6 +3,7 @@
 #include "QBaseNetWorkSession.h"
 #include "SpinLock.h"
 #include "SafeStl.h"
+#include <mutex>
 
 struct CustomPackage
 {
