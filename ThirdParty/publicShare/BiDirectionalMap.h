@@ -52,7 +52,6 @@ public:
         // 现在可以安全插入
         l_to_r[left] = right;
         r_to_l[right] = left;
-        return true;
     }
 
     // 通过左键查找右键
@@ -92,7 +91,7 @@ public:
     }
 
     // 删除（通过右键）
-    void EraseByRight(const R &right)
+    bool EraseByRight(const R &right)
     {
         auto it = r_to_l.find(right);
         if (it == r_to_l.end())

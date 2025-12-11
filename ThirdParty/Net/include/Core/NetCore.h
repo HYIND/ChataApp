@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef __linux__
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -12,11 +11,6 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include "fmt/core.h"
-#elif _WIN32
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#pragma comment(lib, "Ws2_32.lib")
-#endif
 
 #include <string.h>
 #include <signal.h>
@@ -59,3 +53,4 @@
 EXPORT_FUNC void InitNetCore();
 EXPORT_FUNC void RunNetCoreLoop(bool isBlock = false);
 EXPORT_FUNC bool NetCoreRunning();
+EXPORT_FUNC void StopNetCoreLoop();

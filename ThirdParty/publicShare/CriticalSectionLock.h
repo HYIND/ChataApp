@@ -2,6 +2,7 @@
 
 #ifdef __linux__
 #include <pthread.h>
+#include <mutex>
 #endif
 
 class CriticalSectionLock
@@ -11,7 +12,12 @@ public:
     ~CriticalSectionLock();
     bool TryEnter();
     void Enter();
-    bool Leave();
+    void Leave();
+
+    // 适配std::lock_guard
+public:
+    void lock();
+    void unlock();
 
 private:
 #ifdef __linux__
