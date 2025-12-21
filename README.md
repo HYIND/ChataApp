@@ -15,7 +15,7 @@
 
 定义简单工具供调用查询当前用户信息<br>
 ![image](https://github.com/HYIND/ChataApp/blob/master/images/image3.png?raw=true)
-工具查询结果并回复<br>
+<br><br><br>工具查询结果并回复<br>
 ![image](https://github.com/HYIND/ChataApp/blob/master/images/image4.png?raw=true)
 
 
@@ -23,5 +23,5 @@
 定义工具使ai具备发送消息的功能<br>
 ![image](https://github.com/HYIND/ChataApp/blob/master/images/image5.png?raw=true)
 ![image](https://github.com/HYIND/ChataApp/blob/master/images/image6.png?raw=true)
-<br>自动帮助用户发送消息<br>
+<br><br><br>自动帮助用户发送消息<br>
 ![image](https://github.com/HYIND/ChataApp/blob/master/images/image7.png?raw=true)
