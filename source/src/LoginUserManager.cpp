@@ -45,6 +45,28 @@ User *GeneratePublicChat()
     return publicchat;
 }
 
+std::string GenerateRandomName(const string& uuid)
+{
+    static std::vector<std::string> randomprefix =
+    {
+        "monkey",
+        "rabbit",
+        "puppies",
+        "fox",
+        "goat",
+        "hamster",
+        "squirrel"
+    };
+
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(0, randomprefix.size() - 1);
+
+    size_t randomIndex = dis(gen) % randomprefix.size();
+
+    return randomprefix[randomIndex] + uuid;
+}
+
 bool LoginUserManager::IsPublicChat(const string &token)
 {
     return publicchattoken == token;
@@ -90,7 +112,7 @@ bool LoginUserManager::Login(BaseNetWorkSession *session, string ip, uint16_t po
         string uuid = GenerateSimpleUuid();
         User *u = new User();
         u->token = uuid;
-        u->name = "用户" + uuid.substr(uuid.size() - 4, 4);
+        u->name = GenerateRandomName(uuid.substr(uuid.size() - 4, 4));
         u->ip = ip;
         u->port = port;
         u->session = session;
