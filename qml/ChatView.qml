@@ -1,5 +1,6 @@
 import QtQuick
-import QtQuick.Controls 2.5
+import QtQuick.Controls
+import QtQuick.Layouts
 
 Item {
     id: root
@@ -8,7 +9,6 @@ Item {
     property var sessionModel: null
     readonly property bool hasActiveSession: (root.sessionModel
                                               && root.sessionModel.sessionToken) ? true : false
-
     // 空白状态提示（当sessionToken为空时显示）
     Rectangle {
         visible: !hasActiveSession
@@ -121,70 +121,112 @@ Item {
                 }
             }
 
-            //中间的消息显示
-            ListView {
-                id: chatmsglist
-                width: parent.width
-                height: parent.height - editarea.height - chatinfoarea.height
-                model: root.sessionModel
-                clip: true
-                delegate: MessageDelegate {
-                    width: chatmsglist.width
+            Rectangle {
+                id:chatmsglistarea
+                color:"transparent"
+                anchors {
+                    top: chatinfoarea.bottom
+                    left: parent.left
+                    right: parent.right
+                    bottom: editarea.top
+                    margins: 8
                 }
-                Connections {
-                    target: root.sessionModel
-                    function onNewMessageAdded() {
-                        scrollDelayTimer.stop()
-                        scrollDelayTimer.start()
+                //中间的消息显示
+                ListView {
+                    id: chatmsglist
+                    anchors.fill: parent
+                    // width: parent.width
+                    // height: parent.height
+                    model: root.sessionModel
+                    clip: true
+                    delegate: MessageDelegate {
+                        width: chatmsglist.width
                     }
-                }
-                spacing: 5
-                // onCountChanged: {
-                //     scrollDelayTimer.stop()
-                //     scrollDelayTimer.start()
-                // }
-                onHeightChanged: {
-                    chatmsglist.cacheBuffer = Math.max(chatmsglist.height * 3,
-                                                       chatmsglist.cacheBuffer)
-                }
-
-                cacheBuffer: height * 3
-
-                Timer {
-                    id: scrollDelayTimer
-                    interval: 170 // 0.17秒延迟
-                    onTriggered: {
-                        function docheck() {
-                            chatmsglist.positionViewAtEnd()
-                            // chatmsglist.contentY = Math.max(
-                            //             chatmsglist.contentHeight - chatmsglist.height
-                            //             + chatmsglist.bottomMargin, 0)
-                            if (chatmsglist.contentY > chatmsglist.bottomMargin)
-                                chatmsglist.contentY = chatmsglist.contentY + chatmsglist.bottomMargin
+                    Connections {
+                        target: root.sessionModel
+                        function onNewMessageAdded() {
+                            scrollDelayTimer.stop()
+                            scrollDelayTimer.start()
                         }
-                        var numberEqual = 0
-                        var lastContentY = chatmsglist.contentY
-                        while (Qt.callLater(docheck)) {
-                            if (lastContentY == chatmsglist.contentY) {
-                                if (numberEqual >= 10) {
-                                    break
+                    }
+
+                    spacing: 5
+                    onHeightChanged: {
+                        chatmsglist.cacheBuffer = Math.max(chatmsglist.height * 3,
+                                                           chatmsglist.cacheBuffer)
+                    }
+
+                    cacheBuffer: height * 3
+
+                    Timer {
+                        id: scrollDelayTimer
+                        interval: 170 // 0.17秒延迟
+                        onTriggered: {
+                            function docheck() {
+                                chatmsglist.positionViewAtEnd()
+                                // chatmsglist.contentY = Math.max(
+                                //             chatmsglist.contentHeight - chatmsglist.height
+                                //             + chatmsglist.bottomMargin, 0)
+                                if (chatmsglist.contentY > chatmsglist.bottomMargin)
+                                    chatmsglist.contentY = chatmsglist.contentY + chatmsglist.bottomMargin
+                            }
+                            var numberEqual = 0
+                            var lastContentY = chatmsglist.contentY
+                            while (Qt.callLater(docheck)) {
+                                if (lastContentY == chatmsglist.contentY) {
+                                    if (numberEqual >= 10) {
+                                        break
+                                    } else {
+                                        numberEqual++
+                                    }
                                 } else {
-                                    numberEqual++
+                                    numberEqual = 0
                                 }
-                            } else {
-                                numberEqual = 0
+                            }
+                        }
+                    }
+                    bottomMargin: 20
+                    ScrollBar.vertical: ScrollBar {
+                        id: verticalScrollBar
+                        width: 6
+                        policy: ScrollBar.AsNeeded
+
+                        background: Rectangle {
+                            color: "transparent"
+                        }
+
+                        contentItem: Rectangle {
+                            implicitWidth: 6
+                            radius: 3
+                            z : 10
+                            color: "#1abc9c"
+                            opacity:
+                            {
+                                if (verticalScrollBar.pressed) {
+                                    return 1.0
+                                } else if (verticalScrollBar.hovered) {
+                                    return 0.8
+                                } else {
+                                    return 0.6
+                                }
+                            }
+                            Behavior on opacity {
+                                NumberAnimation { duration: 100 }
                             }
                         }
                     }
                 }
-                bottomMargin: 20
             }
 
             //下方的编辑区域
             Rectangle {
                 id: editarea
                 color: "#00000000"
-                width: parent.width
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
+                }
                 height: 220
                 border.color: "#dcdad9"
 
@@ -264,24 +306,6 @@ Item {
                                     }
                                 }
                             }
-
-                            //滚动条
-                            // ScrollBar {
-                            //     id: vbar
-                            //     hoverEnabled: true
-                            //     active: hovered || pressed //鼠标在文本编辑框内或者按下鼠标显示滚动条
-                            //     orientation: Qt.Vertical //垂直方向
-                            //     size: frame.height / textEdit.height
-                            //     width: 10
-                            //     //滚动条位置-右边
-                            //     anchors.top: parent.top
-                            //     anchors.right: parent.right
-                            //     anchors.bottom: parent.bottom
-                            //     //滚动条背景
-                            //     background: Rectangle {
-                            //         color: "green"
-                            //     }
-                            // }
                         }
                     }
                     //发送按钮区域

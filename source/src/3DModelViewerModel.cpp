@@ -1,6 +1,7 @@
 #include "3DModelViewerModel.h"
 #include <QOpenGLFramebufferObject>
 #include <QTimer>
+#include <QQuickWindow>
 
 float CameraUtils::calculateDistanceToFit(float objectRadius, float fovDegrees, float viewportWidth, float viewportHeight)
 {

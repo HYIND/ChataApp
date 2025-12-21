@@ -153,6 +153,11 @@ public:
 
 public:
     bool findbytoken(const QString& token,int* pindex=nullptr);
+    bool findtokenbyname(const QString &name, QString &token);
+
+    const QVector<ChatItemData>& getAllUserInfo();
+    bool isUseronline(const QString &token);
+
     bool getMsgsByToken(const QString& token,QList <ChatMsg>& chatmsgs);
     bool getChatSessionDataByToken(const QString& token, QString& name, QString& address, QList <ChatMsg>& chatmsgs);
     void activeSession(const QString& token);

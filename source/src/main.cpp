@@ -7,6 +7,7 @@
 #include "RequestManager.h"
 #include "3DModelViewerModel.h"
 #include <QQuickWindow>
+#include "LlamaModel.h"
 
 int main(int argc, char *argv[])
 {
@@ -14,11 +15,18 @@ int main(int argc, char *argv[])
 
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
+    LLAMAMODEL->load("./chatmodel.gguf");
+    if(LLAMAMODEL->isLoaded())
+    {
+        std::thread T(&LlamaModel::runasyncprocess,LLAMAMODEL);
+        T.detach();
+    }
+
     qmlRegisterType<OpenGLModelRenderItem>("OpenGLRendering", 1, 0, "OpenGLRenderItem");
 
     QQmlApplicationEngine engine;
     const QUrl url(QStringLiteral("qrc:/qml/Main.qml"));
-    // const QUrl url(QStringLiteral("qrc:/qml/3DModelViewer.qml"));
+    // const QUrl url(QStringLiteral("qrc:/qml/LlamaChatWindow.qml"));
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreated,
@@ -35,6 +43,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("sessionmodel", SESSIONMODEL);
     engine.rootContext()->setContextProperty("userinfomodel", USERINFOMODEL);
     engine.rootContext()->setContextProperty("loginmodel", LOGINMODEL);
+    engine.rootContext()->setContextProperty("llamamodel", LLAMAMODEL);
     engine.load(url);
 
     // 创建局部事件循环和超时控制器等待子线程完成初始化

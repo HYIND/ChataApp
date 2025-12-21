@@ -11,4 +11,5 @@ ModelManager::ModelManager(QObject* parent){
     m_chatsessionmodel = new ChatSessionModel();
     m_userinfomodel = new UserInfoModel();
     m_loginmodel = new LoginModel();
+    m_llamamodel = new LlamaModel();
 }

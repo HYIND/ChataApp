@@ -335,6 +335,39 @@ bool ChatItemListModel::findbytoken(const QString &token,int* pindex)
     return result;
 }
 
+bool ChatItemListModel::findtokenbyname(const QString &name, QString &token)
+{
+    bool result = false;
+    for (int i=0;i<m_chatitems.size();i++)
+    {
+        if(m_chatitems[i].name==name)
+        {
+            result = true;
+            token = m_chatitems[i].token;
+            break;
+        }
+    }
+
+    return result;
+}
+
+const QVector<ChatItemData> &ChatItemListModel::getAllUserInfo()
+{
+    return m_chatitems;
+}
+
+bool ChatItemListModel::isUseronline(const QString &token)
+{
+    for (int i=0;i<m_chatitems.size();i++)
+    {
+        if(m_chatitems[i].token==token)
+        {
+            return m_chatitems[i].isOnline;
+        }
+    }
+    return false;
+}
+
 bool ChatItemListModel::getChatSessionDataByToken(const QString &token, QString &name, QString &address, QList<ChatMsg> &chatmsgs)
 {
     for (int i=0;i<m_chatitems.size();i++)

@@ -11,5 +11,10 @@
         <file>qml/FilePickerButton.qml</file>
         <file>qml/ImgPreviewWindow.qml</file>
         <file>qml/3DModelViewer.qml</file>
+        <file>qml/LlamaChatWindow.qml</file>
+        <file>qml/TipPopup.qml</file>
+    </qresource>
+    <qresource prefix="/icon">
+        <file>assets/images/AIChatLogo.png</file>
     </qresource>
 </RCC>

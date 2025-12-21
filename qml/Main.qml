@@ -5,11 +5,17 @@ Window {
 
     id: root
 
+    // 将窗口位置绑定到属性
+    property point windowPosition: Qt.point(x, y)
+    onXChanged: windowPosition = Qt.point(x, y)
+    onYChanged: windowPosition = Qt.point(x, y)
+
     Component {
         id: chatpage
         ChatPage {
             width: parent.width
             height: parent.height
+            windowPos: root.windowPosition
         }
     }
     Component {

@@ -22,6 +22,8 @@ set(APP_SOURCES
     source/src/MessagePackage.cpp
     source/src/NetWorkHelper.cpp
     source/src/3DModelViewerModel.cpp
+    source/src/LlamaModel.cpp
+    source/src/LlamaToolHelper.cpp
 
 
     source/network/QCustomTcpSession.cpp
@@ -49,6 +51,9 @@ set(APP_INCLUDES
     source/include/MessagePackage.h
     source/include/NetWorkHelper.h
     source/include/3DModelViewerModel.h
+    source/include/LlamaModel.h
+    source/include/LlamaToolHelper.h
+
 
     source/network/QCustomTcpSession.h
     source/network/Buffer.h
@@ -85,17 +90,20 @@ qt_add_qml_module(appchat_qml_client
         qml/ChatPage.qml
         qml/ImgPreviewWindow.qml
         qml/3DModelViewer.qml
+        qml/LlamaChatWindow.qml
+        qml/TipPopup.qml
     RESOURCES
         resource.qrc
 )
 
-include_directories(source/include source/network ThirdParty/)
+include_directories(source/include source/network ThirdParty/ ThirdParty/llama.cpp)
 
 target_include_directories(appchat_qml_client
     PRIVATE
         source/include
         source/network
         ThirdParty/
+        ThirdParty/llama.cpp
 )
 
 find_package(Qt6 COMPONENTS Core5Compat REQUIRED)
@@ -137,3 +145,6 @@ install(TARGETS appchat_qml_client
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+target_link_libraries(appchat_qml_client PRIVATE ${CMAKE_SOURCE_DIR}/lib/llama.lib)
+

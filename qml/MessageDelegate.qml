@@ -86,6 +86,7 @@ Item {
 
                 Component {
                     id: bubble_picture
+
                     //消息气泡(图片)
                     Rectangle {
                         id: messagebubble_picture
@@ -485,38 +486,36 @@ Item {
                     Rectangle {
                         id: messagebubble_text
                         visible: model.type == 1
-                        width: messageText.width + 20
-                        height: messageText.height + 16
+                        width: Math.min(messageText.implicitWidth + messageText.font.pixelSize * 2, root.width * 0.7, 380)
+                        height: messageText.implicitHeight + messageText.font.pixelSize * 1.5
                         radius: 8
                         color: "#7cdcfe"
 
                         anchors.right: isCurrentUser ? parent.right : undefined
                         anchors.left: isCurrentUser ? undefined : parent.left
 
-                        TextMetrics {
-                            id: textMetrics
-                            font: messageText.font
-                            text: messageText.text
-                            elide: Text.ElideNone
-                        }
-
-                        TextArea {
+                        TextEdit {
                             id: messageText
-                            leftPadding: 0
-                            rightPadding: 0
-                            topPadding: 0
-                            bottomPadding: 0
-                            font.family: "Microsoft YaHei"
-                            font.pixelSize: 12
-                            width: Math.min(textMetrics.width + 5,
-                                            root.width * 0.7, 380)
-                            height: messageText.implicitHeight
                             anchors.centerIn: parent
+                            anchors.margins: font.pixelSize
                             text: model.msg
-                            wrapMode: Text.Wrap
-                            background: Rectangle {
-                                color: "transparent"
-                            }
+                            font.bold: false
+                            font.pixelSize: 13
+                            color: "black"
+                            width: Math.min(implicitWidth, messagebubble_text.width - messageText.font.pixelSize * 2)
+                            wrapMode: TextEdit.Wrap
+
+                            // 文本选择功能
+                            selectByMouse: true
+                            selectByKeyboard: true
+                            readOnly: true // 只读模式
+
+                            // 透明背景
+                            textMargin: 0
+
+                            // 如果需要自定义选择颜色
+                            selectionColor: "lightblue"
+                            // selectedTextColor: "black"
                         }
                     }
                 }

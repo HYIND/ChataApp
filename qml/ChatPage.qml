@@ -4,6 +4,16 @@ import QtQuick.Controls
 Item {
     id:root
 
+    property point windowPos
+
+    TipPopup {
+        id: tipPopup
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.bottomMargin: 50
+        showtime:1000
+    }
+
     // MouseArea{
     //     anchors.fill: parent
     //     propagateComposedEvents: true
@@ -15,6 +25,13 @@ Item {
     //         mouse.accepted = false
     //     }
     // }
+
+    // 监听传入的位置变化
+    onWindowPosChanged: {
+        var point = aichatmousearea.mapToItem(null, 0, 0)
+        var mappoint = Qt.point(windowPos.x, point.y+windowPos.y)
+        aichatwindow.setTailPostion(mappoint.x,mappoint.y)
+    }
 
     Row {
         id:mainContent
@@ -42,12 +59,12 @@ Item {
             Row {
                 width: parent.width
                 height: parent.height - userinfo.height
-                //定义左边黑色工具栏
+                //定义左边工具栏
                 Rectangle {
                     id: toolarea
                     width: 80
                     height: parent.height
-                    color: '#2e2e2e'
+                    color: '#f2f2f2'
 
                     //定义工具栏上边的社交类按钮
                     Rectangle {
@@ -76,7 +93,7 @@ Item {
                         }
                     }
 
-                    //定义工具栏下边的设置类按钮
+                    //定义工具栏下边的功能类按钮
                     Rectangle {
                         color: "#00000000"
                         y: parent.height - height - 20
@@ -85,12 +102,76 @@ Item {
                         width: parent.width
                         height: 200
 
-                        // Button {
-                        //     anchors.horizontalCenter: parent.horizontalCenter
-                        //     anchors.bottom: parent.bottom
-                        //     width: parent.width - 18
-                        //     height: 50
-                        // }
+                        Column {
+                            anchors.fill: parent
+                            spacing: 8
+
+                            Rectangle {
+                                id: aiToolButton
+                                width: parent.width - 18
+                                height: 50
+                                radius: 5
+                                color: aichatwindow.visible ? "#1abc9c" : toolarea.color
+                                anchors.horizontalCenter: parent.horizontalCenter
+
+                                Image {
+                                    anchors.centerIn: parent
+                                    source: "qrc:/icon/assets/images/AIChatLogo.png"
+                                    width: 40
+                                    height: 40
+                                    sourceSize: Qt.size(40, 40)
+                                }
+
+                                // 提示文本
+                                // Text {
+                                //     anchors {
+                                //         top: parent.bottom
+                                //         horizontalCenter: parent.horizontalCenter
+                                //         topMargin: 5
+                                //     }
+                                //     text: "AI助手"
+                                //     color: "white"
+                                //     font.pixelSize: 10
+                                // }
+
+                                MouseArea {
+                                    id: aichatmousearea
+                                    LlamaChatWindow {
+                                        id: aichatwindow
+                                        onVisibleChanged:{
+                                            if(!visible){
+                                                aichatmousearea.onExited()
+                                            }
+                                        }
+                                        model:llamamodel
+                                    }
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if(llamamodel.isLoaded()) {
+                                            root.onWindowPosChanged()
+                                            aichatwindow.visible = !aichatwindow.visible
+                                        }
+                                        else {
+                                            tipPopup.show("AI功能暂不可用哦！")
+                                        }
+                                    }
+
+                                    onEntered: {
+                                        if (!aichatwindow.visible) {
+                                            aiToolButton.color = "#1abc9c"
+                                        }
+                                    }
+                                    onExited: {
+                                        if (!aichatwindow.visible) {
+                                            aiToolButton.color = toolarea.color
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
