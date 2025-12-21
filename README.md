@@ -23,5 +23,5 @@
 定义工具使ai具备发送消息的功能<br>
 ![image](https://github.com/HYIND/ChataApp/blob/master/images/image5.png?raw=true)
 ![image](https://github.com/HYIND/ChataApp/blob/master/images/image6.png?raw=true)
-自动帮助用户发送消息<br>
+<br>自动帮助用户发送消息<br>
 ![image](https://github.com/HYIND/ChataApp/blob/master/images/image7.png?raw=true)
