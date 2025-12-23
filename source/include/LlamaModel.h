@@ -37,8 +37,9 @@ enum class GenerateState {
 
 struct AITask
 {
-    std::string user_input;
-    std::string prompt;
+    std::string userinput; //用于增量更新
+    std::vector<llamaChatMsg> toolsmsg; //用于增量更新
+    std::string extraprompt;  //用于增量更新
     std::string output;
 
     GenerateState state = GenerateState::talking;
@@ -51,10 +52,8 @@ struct AITask
     int lastoutputpos = 0;
 
     std::vector<llama_batch> batchs;
-    llama_sampler *sampler = nullptr;
     llama_token next_token = LLAMA_TOKEN_NULL;
     int current_gen = 0;
-    int current_pos = 0;
 
     bool iscontinuetask = false;
 };
@@ -76,17 +75,19 @@ public slots:
     void pauseGenerate();
     void continueGenerate();
     void reGenerate(bool thinkingEnabled);
+    void clearHistory();
 
 signals:
     void outputText(QString text,int operation); //0结束 1输出内容 2暂停
 
 private:
     std::string buildQwenPrompt(bool add_generation_prompt = true,bool enable_thinking = true);
-    bool preprocess(const std::string& prompt,std::vector<llama_batch>& batchs, uint32_t maxbatchsize);
+    bool preprocess(AITask& task,std::vector<llama_batch>& batchs);
     llama_sampler* getsampler();
     void resetcontext();
+    void clearcontext();
 
-    void processToolCall(const std::string& string);
+    void processToolCall(AITask& task, const std::string& string);
     bool shouldStopGeneration(llama_token& token, const std::string& current_output);
 
     void ClearPausedTask();
@@ -103,6 +104,10 @@ private:
     std::condition_variable m_queprocesscv;
 
     bool shouldpause = false;
+
+    llama_sampler *m_sampler = nullptr;
+    std::vector<llama_token> m_curtokens;
+    int m_decodepos;
 };
 
 #endif

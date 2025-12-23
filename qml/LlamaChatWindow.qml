@@ -29,7 +29,7 @@ Window {
         height: chatBubble.height
         opacity: 1
 
-        // 位置计算：从AI按钮右侧弹出
+        // 位置计算：从AI按钮左侧弹出
         x: 0
         y: 0
 
@@ -94,6 +94,140 @@ Window {
                     }
 
                     Item { Layout.fillWidth: true }
+
+                    // ===== 垃圾桶按钮（清除历史对话） =====
+                    Rectangle {
+                        id: trashButton
+                        width: 30
+                        height: 30
+                        radius: 15
+                        color: "transparent"
+                        opacity: 0.8
+
+                        // 垃圾桶图标
+                        Canvas {
+                            anchors.fill: parent
+                            anchors.margins: 5
+
+                            onPaint: {
+                                var ctx = getContext("2d")
+                                ctx.clearRect(0, 0, width, height)
+                                ctx.strokeStyle = "white"
+                                ctx.lineWidth = 1
+                                ctx.fillStyle = "white"
+                                ctx.lineCap = "square"
+
+                                // 桶盖顶部横线
+                                ctx.beginPath()
+                                ctx.moveTo(3, 6)
+                                ctx.lineTo(17, 6)
+                                ctx.stroke()
+
+                                // 桶盖左侧斜线
+                                ctx.beginPath()
+                                ctx.moveTo(3, 6)
+                                ctx.lineTo(5, 8)
+                                ctx.stroke()
+
+                                // 桶盖右侧斜线
+                                ctx.beginPath()
+                                ctx.moveTo(17, 6)
+                                ctx.lineTo(15, 8)
+                                ctx.stroke()
+
+                                // 桶身边框左右竖线
+                                ctx.beginPath()
+                                ctx.moveTo(5, 8)
+                                ctx.lineTo(5, 20)
+                                ctx.moveTo(15, 8)
+                                ctx.lineTo(15, 20)
+                                ctx.stroke()
+
+                                // 桶底横线
+                                ctx.beginPath()
+                                ctx.moveTo(5, 20)
+                                ctx.lineTo(15, 20)
+                                ctx.stroke()
+
+                                // 桶身竖线（镂空效果）
+                                var lineCount = 4 // 竖线数量
+                                var startX = 6
+                                var endX = 14
+                                var spacing = (endX - startX) / (lineCount - 1)
+
+                                for (var i = 0; i < lineCount; i++) {
+                                    var xPos = startX + i * spacing
+                                    ctx.beginPath()
+                                    ctx.moveTo(xPos, 9) // 从桶盖下方开始
+                                    ctx.lineTo(xPos, 19) // 到桶底上方结束
+                                    ctx.stroke()
+                                }
+
+                                // 桶把手
+                                ctx.beginPath()
+                                ctx.moveTo(8, 4)
+                                ctx.lineTo(12, 4)
+                                ctx.stroke()
+
+                                // 桶把手竖线
+                                ctx.beginPath()
+                                ctx.moveTo(10, 4)
+                                ctx.lineTo(10, 6)
+                                ctx.stroke()
+                            }
+                        }
+
+                        // 鼠标悬停效果
+                        states: [
+                            State {
+                                name: "hovered"
+                                when: trashMouseArea.containsMouse
+                                PropertyChanges {
+                                    target: trashButton
+                                    opacity: 1.0
+                                    scale: 1.1
+                                }
+                            },
+                            State {
+                                name: "pressed"
+                                when: trashMouseArea.pressed
+                                PropertyChanges {
+                                    target: trashButton
+                                    opacity: 0.6
+                                    scale: 0.95
+                                }
+                            }
+                        ]
+
+                        transitions: [
+                            Transition {
+                                to: "*"
+                                NumberAnimation { properties: "opacity,scale"; duration: 150 }
+                            }
+                        ]
+
+                        // 提示文本
+                        ToolTip {
+                            id: trashToolTip
+                            visible: trashMouseArea.containsMouse
+                            text: "清除历史对话"
+                            delay: 500
+                            timeout: 2000
+                        }
+
+                        MouseArea {
+                            id: trashMouseArea
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+
+                            onClicked: {
+                                // 弹出确认对话框
+                                clearHistory();
+                            }
+                        }
+                    }
+
 
                     // 关闭按钮
                     Rectangle {
@@ -529,6 +663,22 @@ Window {
     function setTailPostion(tailx,taily){
         x = tailx - mainWindow.width;
         y = taily - mainWindow.height + (mainWindow.height - tailCanvas.y)
+    }
+
+    function clearHistory() {
+        if(state != 0 && state != 3)
+            return
+
+        model.clearHistory()
+
+        for (var i = chatColumn.children.length - 1; i >= 0; i--) {
+            var child = chatColumn.children[i]
+            child.destroy()
+        }
+
+        // 重置状态
+        lastaimessagebubble = null
+        state = 0
     }
 
     Connections {

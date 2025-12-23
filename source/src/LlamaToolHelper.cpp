@@ -16,7 +16,7 @@ std::vector<Tool> available_tools = {
      300},
     {"get_time", "Get current Time.", {},7},
     {"get_user_info","Get information of all current user. You can see who is online, whose IP address, or whose name.",{},15},
-    {"send_message_to","Send a message to reciver. The message content is text and the name is name of reciver. if you want to send content to other, you can use it",{{"reciver","name"},{"text","text"}},20}
+    {"send_message_to","Send a message to receiver. The message content is text and the name is name of receiver. if you want to send content to other, you can use it",{{"receiver","name"},{"text","text"}},20}
 };
 
 std::string ToolCall::to_json() const {
@@ -66,19 +66,20 @@ std::vector<Tool> ToolExecutor::gettools()
 
 ToolResult ToolExecutor::execute(const ToolCall &call) {
     ToolResult result;
-
+    std::string callresult;
     if (call.name == "get_user_info") {
-        result.result_str = executeGetUserInfo(call);
+        callresult = executeGetUserInfo(call);
     } else if (call.name == "send_message_to") {
-        result.result_str = executeSendMessage(call);
+        callresult = executeSendMessage(call);
     } else if (call.name == "get_time") {
-        result.result_str = executeGetTime(call);
+        callresult = executeGetTime(call);
     } else if (call.name == "calculator") {
-        result.result_str = executeCalculator(call);
+        callresult = executeCalculator(call);
     } else {
-        result.result_str = R"({"error": "Unknown tool: )" + call.name + R"("})";
-        return result;
+       callresult = R"({"error": "Unknown tool: )" + call.name + R"("})";
     }
+
+    result.result_str=  R"({"toolresult": {"callname":"name","callresult":)" + callresult +R"(}})";
 
     for(auto &tool : available_tools)
     {
@@ -128,13 +129,13 @@ std::string ToolExecutor::executeGetUserInfo(const ToolCall &call) {
 std::string ToolExecutor::executeSendMessage(const ToolCall &call) {
     QString name, content;
     {
-        auto it = call.arguments.find("reciver");
+        auto it = call.arguments.find("receiver");
         if (it == call.arguments.end()) {
-            return R"({"error": "Missing reciver name"})";
+            return R"({"error": "Missing receiver name"})";
         }
         if(it->second.empty())
         {
-            return R"({"error": "Empty reciver name "})";
+            return R"({"error": "Empty receiver name "})";
         }
         name = QString::fromStdString(it->second);
     }
@@ -153,11 +154,11 @@ std::string ToolExecutor::executeSendMessage(const ToolCall &call) {
     QString token;
     if(!CHATITEMMODEL->findtokenbyname(name,token))
     {
-        return R"({"error": "reciver not found"})";
+        return R"({"error": "receiver not found"})";
     }
     if(!CHATITEMMODEL->isUseronline(token))
     {
-        return R"({"error": "reciver not online"})";
+        return R"({"error": "receiver not online"})";
     }
 
     SESSIONMODEL->sendMessage(token,content);
