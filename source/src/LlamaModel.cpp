@@ -853,8 +853,11 @@ void LlamaModel::inputText(QString text, bool thinkingEnabled)
     if(!m_loaded)
         return;
 
-    ClearPausedTask();
-    clearcontext();
+
+    if (!m_inputtask.empty()) {
+        ClearPausedTask();
+        clearcontext();
+    }
 
     AITask task;
     task.userinput = text.toStdString();
@@ -1067,7 +1070,8 @@ void LlamaModel::continueGenerate()
 // 清除掉最后一次用户输入以后的历史记录，然后继续生成
 void LlamaModel::reGenerate(bool thinkingEnabled)
 {
-    ClearPausedTask();
+    if(!m_inputtask.empty())
+        ClearPausedTask();
 
     std::string user_input_text;
     bool thinking = false;
