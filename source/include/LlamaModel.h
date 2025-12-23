@@ -10,24 +10,61 @@
 #include "llama-cpp.h"
 #include "LlamaToolHelper.h"
 
+struct llamaChatMsg;
+struct AITask;
+
 struct llamaChatMsg{
     std::string role;
     std::string content;
     std::string reasoning_content;  // 思考内容（如果有）
     int64_t out_time;
+    bool usetool;
+    bool usethinking;
 
-    llamaChatMsg(std::string role,std::string content,std::string reasoning_content="",int64_t out_time = INT64_MAX);
+    int tokensize;
+    std::vector<llama_token> tokens;
+
+    llamaChatMsg(std::string role,std::string content,std::string reasoning_content="",int64_t out_time = INT64_MAX, bool usetool = false);
     bool has_think_tags() const;
     std::string extract_thinking() const;
     std::string extract_content_without_thinking() const;
+};
+
+enum class GenerateState {
+    thinking = 0,
+    talking = 2,
+};
+
+struct AITask
+{
+    std::string user_input;
+    std::string prompt;
+    std::string output;
+
+    GenerateState state = GenerateState::talking;
+    bool onusetool = false;
+    bool firstoutputthinkingtext = true;
+    bool firstoutputtalkingtext = true;
+
+    int generatecount = 3;
+    bool needthinking = true;
+    int lastoutputpos = 0;
+
+    std::vector<llama_batch> batchs;
+    llama_sampler *sampler = nullptr;
+    llama_token next_token = LLAMA_TOKEN_NULL;
+    int current_gen = 0;
+    int current_pos = 0;
+
+    bool iscontinuetask = false;
 };
 
 class LlamaModel :public QObject{
     Q_OBJECT
 public:
     bool load(const std::string& model_path);
-    bool processTask(const std::string& user_input);
-    bool generate(const std::string& prompt, std::string& out,std::function<void()> outputchangecallback=nullptr);
+    bool processTask(AITask &user_input);
+    bool generate(AITask& task,std::function<void()> outputchangecallback=nullptr);
 
     void runasyncprocess();
 
@@ -35,19 +72,24 @@ public:
 
 public slots:
     bool isLoaded() const;
-    void inputText(QString text);
+    void inputText(QString text,bool thinkingEnabled);
+    void pauseGenerate();
+    void continueGenerate();
+    void reGenerate(bool thinkingEnabled);
 
 signals:
-    void outputText(QString text,bool isend);
+    void outputText(QString text,int operation); //0结束 1输出内容 2暂停
 
 private:
-    std::string buildPrompt(bool add_generation_prompt = true,bool enable_thinking = true);
-    bool preprocess(const std::string& prompt,llama_batch& batch);
+    std::string buildQwenPrompt(bool add_generation_prompt = true,bool enable_thinking = true);
+    bool preprocess(const std::string& prompt,std::vector<llama_batch>& batchs, uint32_t maxbatchsize);
     llama_sampler* getsampler();
     void resetcontext();
 
     void processToolCall(const std::string& string);
     bool shouldStopGeneration(llama_token& token, const std::string& current_output);
+
+    void ClearPausedTask();
 
 private:
     llama_model* m_model = nullptr;
@@ -56,9 +98,11 @@ private:
     std::vector<llamaChatMsg> m_chathistory;
     bool m_loaded = false;
 
-    SafeQueue<std::string> m_inputtask;
+    SafeQueue<AITask> m_inputtask;
     std::mutex m_quemutex;
     std::condition_variable m_queprocesscv;
+
+    bool shouldpause = false;
 };
 
 #endif

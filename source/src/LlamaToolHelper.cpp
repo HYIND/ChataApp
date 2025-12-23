@@ -2,12 +2,21 @@
 #include <QDebug>
 #include <sstream>
 #include "ModelManager.h"
+#include "nlohmann/json.hpp"
+
+
 
 std::vector<Tool> available_tools = {
-    {"calculator", "Perform calculations between two numbers.", {{"expression", "55+55"}},300},
-    {"get_time", "Get current Time.", {},10},
-    {"get_user_info","Get information of all current user. You can see who is online, whose IP address, or whose name.",{},30},
-    {"send_message_to_user","Send a message to the user whose by username. The message content is text. if you want to send content to other, you can use it",{{"username","username"},{"text","text"}},30}
+    {"calculator",
+     "Perform calculations between two number. "
+     "number1 is the first number. "
+     "number2 is the second number. "
+     "all number must be enclosed in double quotes. operation can be one of +-*/ operator.",
+     {{"number1","number"},{"number2","number"},{"operation","operators"}},
+     300},
+    {"get_time", "Get current Time.", {},7},
+    {"get_user_info","Get information of all current user. You can see who is online, whose IP address, or whose name.",{},15},
+    {"send_message_to","Send a message to reciver. The message content is text and the name is name of reciver. if you want to send content to other, you can use it",{{"reciver","name"},{"text","text"}},20}
 };
 
 std::string ToolCall::to_json() const {
@@ -24,37 +33,29 @@ std::string ToolCall::to_json() const {
 
 ToolCall ToolCall::from_json(const std::string &jsonStr) {
     ToolCall call;
-    // 简化的JSON解析，可以使用 nlohmann/json 库更好
-    size_t name_pos = jsonStr.find(R"("name":")");
-    if (name_pos != std::string::npos) {
-        name_pos += 8; // 跳过 "name":"
-        size_t name_end = jsonStr.find(R"(")", name_pos);
-        call.name = jsonStr.substr(name_pos, name_end - name_pos);
-    }
 
-    size_t args_pos = jsonStr.find(R"("arguments":{)");
-    if (args_pos != std::string::npos) {
-        args_pos += 13; // 跳过 "arguments":{
-        std::string args_str = jsonStr.substr(args_pos);
-        args_str = args_str.substr(0, args_str.find('}'));
+    try {
+        auto j = nlohmann::json::parse(jsonStr);
 
-        // 解析参数
-        size_t pos = 0;
-        while (pos < args_str.length()) {
-            size_t key_start = args_str.find(R"(")", pos);
-            if (key_start == std::string::npos) break;
-            size_t key_end = args_str.find(R"(")", key_start + 1);
-            std::string key = args_str.substr(key_start + 1, key_end - key_start - 1);
-
-            size_t value_start = args_str.find(R"(")", key_end + 1);
-            if (value_start == std::string::npos) break;
-            size_t value_end = args_str.find(R"(")", value_start + 1);
-            std::string value = args_str.substr(value_start + 1, value_end - value_start - 1);
-
-            call.arguments[key] = value;
-            pos = value_end + 1;
+        // 解析 name
+        if (j.contains("name") && j["name"].is_string()) {
+            call.name = j["name"].get<std::string>();
         }
+
+        // 解析 arguments
+        if (j.contains("arguments") && j["arguments"].is_object()) {
+            auto args_obj = j["arguments"];
+            for (auto it = args_obj.begin(); it != args_obj.end(); ++it) {
+                if (it.value().is_string()) {
+                    call.arguments[it.key()] = it.value().get<std::string>();
+                }
+            }
+        }
+    } catch (const nlohmann::json::exception& e) {
+        std::cerr << "ToolCall::from_json JSON parse error: " << e.what() << std::endl;
+        return ToolCall();
     }
+
     return call;
 }
 
@@ -68,7 +69,7 @@ ToolResult ToolExecutor::execute(const ToolCall &call) {
 
     if (call.name == "get_user_info") {
         result.result_str = executeGetUserInfo(call);
-    } else if (call.name == "send_message_to_user") {
+    } else if (call.name == "send_message_to") {
         result.result_str = executeSendMessage(call);
     } else if (call.name == "get_time") {
         result.result_str = executeGetTime(call);
@@ -127,15 +128,15 @@ std::string ToolExecutor::executeGetUserInfo(const ToolCall &call) {
 std::string ToolExecutor::executeSendMessage(const ToolCall &call) {
     QString name, content;
     {
-        auto it = call.arguments.find("username");
+        auto it = call.arguments.find("reciver");
         if (it == call.arguments.end()) {
-            return R"({"error": "Missing username"})";
+            return R"({"error": "Missing reciver name"})";
         }
         if(it->second.empty())
         {
-            return R"({"error": "Empty username"})";
+            return R"({"error": "Empty reciver name "})";
         }
-        name = QString::fromUtf8(it->second);
+        name = QString::fromStdString(it->second);
     }
     {
         auto it = call.arguments.find("text");
@@ -146,17 +147,17 @@ std::string ToolExecutor::executeSendMessage(const ToolCall &call) {
         {
             return R"({"error": "Empty text"})";
         }
-        content = QString::fromUtf8(it->second);
+        content = QString::fromStdString(it->second);
     }
 
     QString token;
     if(!CHATITEMMODEL->findtokenbyname(name,token))
     {
-        return R"({"error": "User not found"})";
+        return R"({"error": "reciver not found"})";
     }
     if(!CHATITEMMODEL->isUseronline(token))
     {
-        return R"({"error": "User not online"})";
+        return R"({"error": "reciver not online"})";
     }
 
     SESSIONMODEL->sendMessage(token,content);
@@ -174,40 +175,89 @@ std::string ToolExecutor::executeGetTime(const ToolCall &call) {
     return R"({"result": "Current time:)" + time_str + R"("})";
 }
 
+// std::string ToolExecutor::executeCalculator(const ToolCall& call) {
+//     auto it = call.arguments.find("expression");
+//     if (it == call.arguments.end()) {
+//         return R"({"error": "Missing expression argument"})";
+//     }
+
+//     // 简单的表达式计算（实际使用时应该用安全的计算库）
+//     std::string expr = it->second;
+//     try {
+//         // 这里使用简单解析，实际应该用数学表达式库
+//         double result = 0;
+//         if (expr.find('+') != std::string::npos) {
+//             size_t pos = expr.find('+');
+//             double a = std::stod(expr.substr(0, pos));
+//             double b = std::stod(expr.substr(pos + 1));
+//             result = a + b;
+//         } else if (expr.find('-') != std::string::npos) {
+//             size_t pos = expr.find('-');
+//             double a = std::stod(expr.substr(0, pos));
+//             double b = std::stod(expr.substr(pos + 1));
+//             result = a - b;
+//         } else if (expr.find('*') != std::string::npos) {
+//             size_t pos = expr.find('*');
+//             double a = std::stod(expr.substr(0, pos));
+//             double b = std::stod(expr.substr(pos + 1));
+//             result = a * b;
+//         } else if (expr.find('/') != std::string::npos) {
+//             size_t pos = expr.find('/');
+//             double a = std::stod(expr.substr(0, pos));
+//             double b = std::stod(expr.substr(pos + 1));
+//             if (b != 0) result = a / b;
+//             else return R"({"error": "Division by zero"})";
+//         } else {
+//             result = std::stod(expr);
+//         }
+
+//         return R"({"result": ")" + std::to_string(result) + R"("})";
+//     } catch (const std::exception& e) {
+//         return R"({"error": "Calculation error: )" + std::string(e.what()) + R"("})";
+//     }
+// }
+
 std::string ToolExecutor::executeCalculator(const ToolCall& call) {
-    auto it = call.arguments.find("expression");
-    if (it == call.arguments.end()) {
-        return R"({"error": "Missing expression argument"})";
+    std::string strnumber1,strnumber2,operation;
+    {
+        auto it = call.arguments.find("number1");
+        if (it == call.arguments.end()) {
+            return R"({"error": "Missing number1 argument"})";
+        }
+        strnumber1 = it->second;
+    }
+    {
+        auto it = call.arguments.find("number2");
+        if (it == call.arguments.end()) {
+            return R"({"error": "Missing number2 argument"})";
+        }
+        strnumber2 = it->second;
+    }
+    {
+        auto it = call.arguments.find("operation");
+        if (it == call.arguments.end()) {
+            return R"({"error": "Missing operation argument"})";
+        }
+        operation = it->second;
     }
 
     // 简单的表达式计算（实际使用时应该用安全的计算库）
-    std::string expr = it->second;
     try {
         // 这里使用简单解析，实际应该用数学表达式库
         double result = 0;
-        if (expr.find('+') != std::string::npos) {
-            size_t pos = expr.find('+');
-            double a = std::stod(expr.substr(0, pos));
-            double b = std::stod(expr.substr(pos + 1));
+        double a = std::stod(strnumber1);
+        double b = std::stod(strnumber2);
+        if (operation.find('+') != std::string::npos) {
             result = a + b;
-        } else if (expr.find('-') != std::string::npos) {
-            size_t pos = expr.find('-');
-            double a = std::stod(expr.substr(0, pos));
-            double b = std::stod(expr.substr(pos + 1));
+        } else if (operation.find('-') != std::string::npos) {
             result = a - b;
-        } else if (expr.find('*') != std::string::npos) {
-            size_t pos = expr.find('*');
-            double a = std::stod(expr.substr(0, pos));
-            double b = std::stod(expr.substr(pos + 1));
+        } else if (operation.find('*') != std::string::npos) {
             result = a * b;
-        } else if (expr.find('/') != std::string::npos) {
-            size_t pos = expr.find('/');
-            double a = std::stod(expr.substr(0, pos));
-            double b = std::stod(expr.substr(pos + 1));
+        } else if (operation.find('/') != std::string::npos) {
             if (b != 0) result = a / b;
             else return R"({"error": "Division by zero"})";
         } else {
-            result = std::stod(expr);
+           return R"({"error": "Calculation error: unknown error!"})";
         }
 
         return R"({"result": ")" + std::to_string(result) + R"("})";

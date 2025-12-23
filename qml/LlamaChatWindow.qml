@@ -5,8 +5,9 @@ import QtQuick.Layouts
 Window {
 
     property var model
-    property int state:0    //0空闲 1推理中 2输出中
-    property var pendingaimessagebubble:null
+    property int state:0    //0空闲 1推理中 2输出中 3用户停止
+    property var lastaimessagebubble:null
+    property bool thinkingEnabled: false
 
     id: mainWindow
     width: chatWindow.width
@@ -156,9 +157,9 @@ Window {
                             z : 10
                             opacity:
                             {
-                                if (verticalScrollBar.pressed) {
+                                if (chatscrollbar.pressed) {
                                     return 1.0
-                                } else if (verticalScrollBar.hovered) {
+                                } else if (chatscrollbar.hovered) {
                                     return 0.8
                                 } else {
                                     return 0.6
@@ -192,7 +193,7 @@ Window {
                     bottom: parent.bottom
                     margins: 10
                 }
-                height: 50
+                height: 80
                 radius: 8
                 color: "#34495e"
 
@@ -207,12 +208,14 @@ Window {
                         placeholderText: "输入消息..."
                         color: "white"
                         font.pixelSize: 14
+                        wrapMode: TextEdit.Wrap
                         background: Rectangle {
                             color: "transparent"
                         }
 
                         Keys.onReturnPressed: {
-                            if (event.modifiers & Qt.ShiftModifier) {
+                            if ((event.modifiers & Qt.ShiftModifier)
+                                    || (event.modifiers & Qt.ControlModifier)) {
                                 // Shift+Enter 换行
                                 event.accepted = false
                             } else {
@@ -223,26 +226,76 @@ Window {
                         }
                     }
 
-                    Button {
-                        id: sendButton
+                    // 右侧按钮列
+                    Column {
+                        Layout.alignment: Qt.AlignVCenter
                         Layout.preferredWidth: 40
-                        Layout.preferredHeight: 40
-                        enabled: messageInput.text.trim().length > 0
+                        spacing: 8
 
-                        background: Rectangle {
-                            radius: 6
-                            color: sendButton.enabled ? "#1abc9c" : "#7f8c8d"
+                        // 滑动开关
+                        Switch {
+                            id: thinkingSwitch
+                            width: 40
+                            height: 20
+                            checked: false
+
+                            // 自定义样式
+                            indicator: Rectangle {
+                                implicitWidth: 40
+                                implicitHeight: 20
+                                radius: 10
+                                color: thinkingSwitch.checked ? "#1abc9c" : "#7f8c8d"
+                                border.color: thinkingSwitch.checked ? "#16a085" : "#95a5a6"
+                                border.width: 2
+
+                                Rectangle {
+                                    x: thinkingSwitch.checked ? parent.width - width - 2 : 2
+                                    y: 2
+                                    width: 16
+                                    height: 16
+                                    radius: 8
+                                    color: "white"
+                                    border.color: "#ddd"
+                                    border.width: 1
+
+                                    Behavior on x {
+                                        NumberAnimation { duration: 150 }
+                                    }
+                                }
+                            }
+                            ToolTip {
+                                visible: thinkingSwitch.hovered
+                                text: thinkingSwitch.checked ? "思考模式已开启" : "思考模式已关闭"
+                                delay: 500
+                            }
+                            onCheckedChanged :
+                            {
+                                thinkingEnabled = thinkingSwitch.checked;
+                            }
                         }
 
-                        contentItem: Text {
-                            text: "➤"
-                            color: "white"
-                            font.pixelSize: 16
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                        // 发送按钮
+                        Button {
+                            id: sendButton
+                            width: 40
+                            height: 40
+                            enabled: messageInput.text.trim().length > 0
 
-                        onClicked: sendMessage()
+                            background: Rectangle {
+                                radius: 6
+                                color: sendButton.enabled ? "#1abc9c" : "#7f8c8d"
+                            }
+
+                            contentItem: Text {
+                                text: "➤"
+                                color: "white"
+                                font.pixelSize: 16
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: sendMessage()
+                        }
                     }
                 }
             }
@@ -286,67 +339,161 @@ Window {
         Item {
             id:bubbleitem
             width: chatColumn.width
-            height: bubble.height
+            // height: bubble.height
+            height: bubble.height + (isAI ? controlRow.height + 10 : 0)
+
 
             property bool isAI: true
             property string message: ""
 
-            Row {
-                width:parent.width
-                leftPadding:7
-                rightPadding:7
-                spacing: 8
-                layoutDirection: isAI ? Qt.LeftToRight : Qt.RightToLeft
+            Column {
+                width: parent.width
+                spacing: 10
+                Row {
+                    width:parent.width
+                    leftPadding:7
+                    rightPadding:7
+                    spacing: 8
+                    layoutDirection: isAI ? Qt.LeftToRight : Qt.RightToLeft
 
-                // 头像
-                Rectangle {
-                    id:profilePicture
-                    width: 30
-                    height: 30
-                    radius: 15
-                    color: isAI ? "#1abc9c" : "#3498db"
+                    // 头像
+                    Rectangle {
+                        id:profilePicture
+                        width: 30
+                        height: 30
+                        radius: 15
+                        color: isAI ? "#1abc9c" : "#3498db"
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: isAI ? "AI" : "我"
-                        color: "white"
-                        font.bold: true
-                        font.pixelSize: 12
+                        Text {
+                            anchors.centerIn: parent
+                            text: isAI ? "AI" : "我"
+                            color: "white"
+                            font.bold: true
+                            font.pixelSize: 12
+                        }
+                    }
+
+                    // 消息气泡
+                    Rectangle {
+                        id: bubble
+                        width: Math.min(messageText.implicitWidth + messageText.font.pixelSize * 2,
+                                        parent.width - (parent.leftPadding + parent.rightPadding + parent.spacing + profilePicture.width))
+                        height: messageText.implicitHeight + messageText.font.pixelSize * 1.5
+                        radius: 8
+                        color: isAI ? "#34495e" : "#1abc9c"
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 10
+                            TextEdit {
+                                id: messageText
+                                anchors.margins: font.pixelSize
+                                text: bubbleitem.message
+                                font.bold: false
+                                font.pixelSize: 14
+                                color: "white"
+                                width: Math.min(implicitWidth, bubble.width - messageText.font.pixelSize * 2)
+
+                                wrapMode: TextEdit.Wrap
+
+                                // 文本选择功能
+                                selectByMouse: true
+                                selectByKeyboard: true
+                                readOnly: true // 只读模式
+
+                                // 透明背景
+                                textMargin: 0
+
+                                // 如果需要自定义选择颜色
+                                selectionColor: "lightblue"
+                                selectedTextColor: "black"
+                            }
+                        }
                     }
                 }
+                // AI消息底部的控制按钮（只有AI消息才显示）
+                Row {
+                    id: controlRow
+                    visible: isAI
+                    width: parent.width
+                    leftPadding: 7 + profilePicture.width + 8  // 对齐头像位置
+                    rightPadding: 7
+                    spacing: 10
+                    layoutDirection: Qt.LeftToRight
 
-                // 消息气泡
-                Rectangle {
-                    id: bubble
-                    width: Math.min(messageText.implicitWidth + messageText.font.pixelSize * 2,
-                                    parent.width - (parent.leftPadding + parent.rightPadding + parent.spacing + profilePicture.width))
-                    height: messageText.implicitHeight + messageText.font.pixelSize * 1.5
-                    radius: 8
-                    color: isAI ? "#34495e" : "#1abc9c"
-                    TextEdit {
-                        id: messageText
-                        anchors.centerIn: parent
-                        anchors.margins: font.pixelSize
-                        text: bubbleitem.message
-                        font.bold: false
-                        font.pixelSize: 14
-                        color: "white"
-                        width: Math.min(implicitWidth, bubble.width - messageText.font.pixelSize * 2)
+                    // 控制按钮
+                    Rectangle {
+                            id: controlpauseButton
+                            width: controlpausetips.implicitWidth + 20
+                            height: 30
+                            radius: 15
+                            border.color: "white"
+                            border.width: 2
+                            color: "transparent"
+                            visible: bubbleitem == mainWindow.lastaimessagebubble &&
+                                     (mainWindow.state == 1 || mainWindow.state == 2 || mainWindow.state == 3)
 
-                        wrapMode: TextEdit.Wrap
+                            Text {
+                                id: controlpausetips
+                                anchors.centerIn: parent
+                                text: {
+                                    if (mainWindow.state == 3) return qsTr("继续生成")
+                                    if (mainWindow.state == 1 || mainWindow.state == 2) return qsTr("停止生成")
+                                    return ""
+                                }
+                                color: "white"
+                                font.pixelSize: 12
+                            }
 
-                        // 文本选择功能
-                        selectByMouse: true
-                        selectByKeyboard: true
-                        readOnly: true // 只读模式
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (mainWindow.state == 3) {
+                                        mainWindow.state = 1
+                                        model.continueGenerate()
+                                    } else if (mainWindow.state == 1 || mainWindow.state == 2) {
+                                        model.pauseGenerate()
+                                    }
+                                }
+                            }
+                        }
+                    Rectangle {
+                        id: controlregenButton
+                        width: controlregentips.implicitWidth + 20
+                        height: 30
+                        radius: 15
+                        border.color: "white"
+                        border.width: 2
+                        color: "transparent"
+                        visible: bubbleitem == mainWindow.lastaimessagebubble &&
+                                 (mainWindow.state == 0 || mainWindow.state == 3)
 
-                        // 透明背景
-                        textMargin: 0
+                        Text {
+                            id: controlregentips
+                            anchors.centerIn: parent
+                            text: {
+                                if (visible) return "重新生成"
+                                return ""
+                            }
+                            color: "white"
+                            font.pixelSize: 12
+                        }
 
-                        // 如果需要自定义选择颜色
-                        selectionColor: "lightblue"
-                        selectedTextColor: "black"
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (visible && lastaimessagebubble)
+                                {
+                                    lastaimessagebubble.message = "..."
+                                    mainWindow.state = 1;
+                                    model.reGenerate(thinkingEnabled);
+                                }
+                            }
+                        }
                     }
+                    Item { Layout.fillWidth: true } // 占位，让按钮靠右
                 }
             }
         }
@@ -356,7 +503,7 @@ Window {
     function sendMessage() {
         var text = messageInput.text.trim()
         if (text.length === 0) return
-        if (state != 0) return
+        if (state != 0 && state != 3) return
 
         state = 1
         // 添加用户消息
@@ -365,7 +512,7 @@ Window {
             message: text
         })
 
-        pendingaimessagebubble = messageBubbleComponent.createObject(chatColumn, {
+        lastaimessagebubble = messageBubbleComponent.createObject(chatColumn, {
                                                                         isAI: true,
                                                                         message: "..."
                                                                     })
@@ -376,7 +523,7 @@ Window {
     }
 
     function doAIRequest(userMessage) {
-        model.inputText(userMessage);
+        model.inputText(userMessage,thinkingEnabled);
     }
 
     function setTailPostion(tailx,taily){
@@ -386,28 +533,34 @@ Window {
 
     Connections {
         target: model
-        function onoutputText(text,isend) {
-            if(!isend)
+        function onoutputText(text,operation) { //0结束 1输出内容 2暂停
+            if(operation == 1)
             {
-                if(state == 1)
-                    pendingaimessagebubble.message = "";
+                if(state == 3)
+                    state = 1
+
+                if(state == 1 && lastaimessagebubble.message == "...")
+                    lastaimessagebubble.message = "";
 
                 state = 2
-                if(pendingaimessagebubble){
-                    pendingaimessagebubble.message = pendingaimessagebubble.message + text;
+                if(lastaimessagebubble){
+                    lastaimessagebubble.message = lastaimessagebubble.message + text;
                 }
                 else {
                     var aiMsg = messageBubbleComponent.createObject(chatColumn, {
                         isAI: true,
                         message: text
                     })
-                    pendingaimessagebubble = aiMsg;
+                    lastaimessagebubble = aiMsg;
                 }
-            }else
+            }
+            else if (operation == 0)
             {
-                if(pendingaimessagebubble)
-                     pendingaimessagebubble = null;
-                state = 0
+               state = 0
+            }
+            else if (operation == 2)
+            {
+               state = 3
             }
         }
     }
