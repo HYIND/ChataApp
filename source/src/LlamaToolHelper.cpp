@@ -52,7 +52,7 @@ ToolCall ToolCall::from_json(const std::string &jsonStr) {
             }
         }
     } catch (const nlohmann::json::exception& e) {
-        std::cerr << "ToolCall::from_json JSON parse error: " << e.what() << std::endl;
+        qDebug() << "ToolCall::from_json JSON parse error: " << e.what() <<"\n"<<QString::fromStdString(jsonStr);
         return ToolCall();
     }
 

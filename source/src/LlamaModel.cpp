@@ -6,7 +6,7 @@
 #include <QDebug>
 #include "LlamaToolHelper.h"
 
-static int global_n_ctx = 8192;
+static int global_n_ctx = 10000;
 
 int64_t GetTimestampMilliseconds()
 {
@@ -125,21 +125,6 @@ std::string stringreplace(const std::string& str,
     return result;
 }
 
-std::string convertEscapedNewlines(std::string& input) {
-    std::string result = input;
-    size_t pos = 0;
-
-    while ((pos = result.find("\\n", pos)) != std::string::npos) {
-        // 替换 \\n 为真正的换行符
-        result.replace(pos, 2, "\n");
-        pos += 1; // 移动到替换后的位置
-    }
-    input = stringreplace(input,"\\n","\n");
-    input = stringreplace(input,"\n\n","\n");
-
-    return result;
-}
-
 std::string trimOuterQuotes(const std::string& str)
 {
     if(str.length()<2)
@@ -183,7 +168,7 @@ std::vector<ToolCall> parseToolCall(const std::string& text) {
             // 移除空白字符
             json_str.erase(0, json_str.find_first_not_of(" \n\r\t"));
             json_str.erase(json_str.find_last_not_of(" \n\r\t") + 1);
-
+            json_str = stringreplace(json_str,"\n","\\n");
             result.emplace_back(ToolCall::from_json(json_str));
             find_pos = end_pos + sizeof("</tool_call>") - 1;
         }
@@ -228,6 +213,42 @@ bool hasFinalResponse(const std::string& output) {
     return !after_think.empty();
 }
 
+static auto gettokenize = [](const std::string& prompt,const llama_vocab* vocab)->std::vector<llama_token>{
+    if(!vocab)
+        return {};
+
+    std::vector<llama_token> tokens;
+    tokens.resize(prompt.size() + 3);
+
+    int n_tokens = llama_tokenize(
+        vocab,
+        prompt.c_str(),
+        prompt.length(),
+        tokens.data(),
+        tokens.size(),
+        false,
+        true
+        );
+
+    if (n_tokens < 0) {
+        tokens.resize(-n_tokens);
+        n_tokens = llama_tokenize(
+            vocab,
+            prompt.c_str(),
+            prompt.length(),
+            tokens.data(),
+            tokens.size(),
+            false,
+            true
+            );
+    }
+
+    if(n_tokens!=tokens.size())
+        tokens.resize(n_tokens);
+
+    return tokens;
+};
+
 bool LlamaModel::shouldStopGeneration(llama_token& token, const std::string& current_output) {
     static std::unordered_map<llama_token, std::string> stop_token_map = {
         {151643, "<|endoftext|>"},
@@ -265,6 +286,9 @@ bool LlamaModel::shouldStopGeneration(llama_token& token, const std::string& cur
 
 void LlamaModel::ClearPausedTask()
 {
+    if(m_inputtask.empty())
+        return;
+
     AITask quetask;
     while(m_inputtask.front(quetask))
     {
@@ -278,6 +302,9 @@ void LlamaModel::ClearPausedTask()
             m_inputtask.dequeue(quetask);
         }
     }
+    std::string endstr = "<|im_end|>\n";
+    auto endtokens = gettokenize(endstr,m_vocab);
+    m_curtokens.insert(m_curtokens.end(),endtokens.begin(),endtokens.end());
 }
 
 bool LlamaModel::load(const std::string& model_path) {
@@ -373,24 +400,67 @@ bool LlamaModel::processTask(AITask &task)
 
         if(task.state != GenerateState::thinking && delta.find("<think>") != std::string::npos)
         {
+            if(task.laststate == GenerateState::none)
+                delta = "-----------------think start-----------------\n\n";
+            else
+                delta = "\n\n-----------------think start-----------------\n\n";
+            QString outputdelta = QString::fromStdString(delta);
+            emit outputText(outputdelta, 1);
+
+            task.laststate = task.state;
             task.state = GenerateState::thinking;
+            task.firstoutputthinkingtext = true;
+
             lastoutputpos = outputpos;
             return;
         }
         if(task.state == GenerateState::thinking && delta.find("</think>") != std::string::npos)
         {
+            delta = "\n\n-----------------think over-----------------\n\n";
+            QString outputdelta = QString::fromStdString(delta);
+            emit outputText(outputdelta, 1);
+
+            task.laststate = task.state;
             task.state = GenerateState::talking;
+
             lastoutputpos = outputpos;
             return;
         }
-        if(!task.onusetool && delta.find("<tool_call>") != std::string::npos)
+        if(delta.find("<tool_call>") != std::string::npos)
         {
-            task.onusetool = true;
-            if(task.state != GenerateState::thinking)
+            if(!task.onusetool)
+                task.onusetool = true;
+
+            if(
+                (task.state == GenerateState::thinking && task.firstoutputthinkingtext) ||
+                (task.state == GenerateState::talking && task.firstoutputtalkingtext)
+                )
+                delta = "------------toolcall start------------\n";
+            else
             {
-                lastoutputpos = outputpos;
-                return;
+                delta = "\n------------toolcall start------------\n";
             }
+            QString outputdelta = QString::fromStdString(delta);
+            emit outputText(outputdelta, 1);
+
+            task.laststate = task.state;
+            task.state = GenerateState::toolusing;
+            task.firstoutputtoolusingtext = true;
+
+            lastoutputpos = outputpos;
+            return;
+        }
+        if(task.state == GenerateState::toolusing && delta.find("</tool_call>") != std::string::npos)
+        {
+            task.state = task.laststate;
+            task.laststate = GenerateState::toolusing;
+
+            delta = "\n------------toolcall over------------\n";
+            QString outputdelta = QString::fromStdString(delta);
+            emit outputText(outputdelta, 1);
+
+            lastoutputpos = outputpos;
+            return;
         }
 
         if(task.state == GenerateState::thinking)
@@ -399,27 +469,30 @@ bool LlamaModel::processTask(AITask &task)
                 delta = trimLeadingWhitespace(delta);
             if(!delta.empty() && isStringEndsWithCompleteUTF8(delta))
             {
-                if(task.firstoutputthinkingtext)
-                    delta = "思考内容：\n" + delta;
                 QString outputdelta = QString::fromStdString(delta);
                 emit outputText(outputdelta, 1);
                 task.firstoutputthinkingtext = false;
                 lastoutputpos = outputpos;
             }
         }
-        else if(task.state == GenerateState::talking && !task.onusetool)
+        else if(task.state == GenerateState::talking)
         {
             if(task.firstoutputtalkingtext)
                 delta = trimLeadingWhitespace(delta);
             if(!delta.empty() && isStringEndsWithCompleteUTF8(delta))
             {
-                if(task.firstoutputtalkingtext)
-                {
-                    if(task.needthinking)
-                        delta = "\n输出内容：\n" + delta;
-                    else
-                        delta = "输出内容：\n" + delta;
-                }
+                QString outputdelta = QString::fromStdString(delta);
+                emit outputText(outputdelta, 1);
+                task.firstoutputtalkingtext = false;
+                lastoutputpos = outputpos;
+            }
+        }
+        else if(task.state == GenerateState::toolusing)
+        {
+            if(task.firstoutputtoolusingtext)
+                delta = trimLeadingWhitespace(delta);
+            if(!delta.empty() && isStringEndsWithCompleteUTF8(delta))
+            {
                 QString outputdelta = QString::fromStdString(delta);
                 emit outputText(outputdelta, 1);
                 task.firstoutputtalkingtext = false;
@@ -493,17 +566,65 @@ bool LlamaModel::processTask(AITask &task)
     return false;
 }
 
-bool LlamaModel::preprocess(AITask& task, std::vector<llama_batch>& batchs)
+// 取出下一个将要处理的batch
+int LlamaModel::GetBatchToProcess(llama_batch& batch, int ori_batch_size)
 {
+    if(!m_ctx)
+        return -1;
 
-    int m_n_ctx = -1;
-    int m_safety_margin = 200;
-    int m_window_size = 0;
-    if(m_ctx)
+    int newbatchlen = ori_batch_size;
+
+    uint32_t curtokenssize = m_curtokens.size();
+    uint32_t newpos = min(m_todecodepos + llama_n_batch(m_ctx) , curtokenssize);
+
+    uint32_t batchlen = newpos - m_todecodepos;
+    if(ori_batch_size < batchlen)
     {
-        m_n_ctx = llama_n_ctx(m_ctx);          // 模型总容量
-        m_window_size = m_n_ctx - 1000 - m_safety_margin;  // 滑动窗口大小（记忆量）
+        if(ori_batch_size>0)
+            llama_batch_free(batch);
+        batch = llama_batch_init(batchlen, 0, 1);
+        newbatchlen = batchlen;
     }
+    else
+    {
+        batch.n_tokens = 0;
+    }
+
+    if (batch.token == nullptr) {
+        qDebug() << "Failed to initialize batch";
+        return false;
+    }
+
+    for (int index = m_todecodepos; index < newpos; index++) {
+        batch.token[batch.n_tokens] = m_curtokens[index];
+        batch.pos[batch.n_tokens] = index;
+        batch.n_seq_id[batch.n_tokens] = 1;
+        batch.seq_id[batch.n_tokens][0] = default_seq_id;
+        batch.logits[batch.n_tokens] = (index == curtokenssize - 1) ? 1 : 0;  // 最后一个输出logits
+        batch.n_tokens++;
+    }
+
+    return newbatchlen;
+}
+
+// 对新加入的任务做解析，将新的prompt进行token化，加入到要处理的m_curtokens中
+bool LlamaModel::preprocess(AITask& task)
+{
+    if(!m_ctx)
+    {
+        // ctx不存在时，直接重建prompt
+        resetcontext();
+        const std::string prompt = buildQwenPrompt(true,task.needthinking);
+        m_curtokens = gettokenize(prompt,m_vocab);
+        return true;
+    }
+
+    // ctx存在时，判断ctx是否达到窗口大小，若达到需要重置
+    // 若ctx仍有冗余，则增量处理新的prompt
+
+    int n_ctx = llama_n_ctx(m_ctx);
+    int safety_margin = 200;
+    int window_size = n_ctx - 1000 - safety_margin;
 
     auto getaddprmpt = [](AITask& task)->std::string
     {
@@ -532,93 +653,19 @@ bool LlamaModel::preprocess(AITask& task, std::vector<llama_batch>& batchs)
         return oss.str();
     };
 
-    auto gettokenize = [this](const std::string& prompt)->std::vector<llama_token>{
-        std::vector<llama_token> tokens;
-        tokens.resize(prompt.size() + 3);
+    std::string addprompt = getaddprmpt(task);
+    std::vector<llama_token> addtokens = gettokenize(addprompt,m_vocab);
+    int newtokensuse = addtokens.size() + m_curtokens.size();
 
-        int n_tokens = llama_tokenize(
-            m_vocab,
-            prompt.c_str(),
-            prompt.length(),
-            tokens.data(),
-            tokens.size(),
-            false,
-            true
-            );
-
-        if (n_tokens < 0) {
-            tokens.resize(-n_tokens);
-            n_tokens = llama_tokenize(
-                m_vocab,
-                prompt.c_str(),
-                prompt.length(),
-                tokens.data(),
-                tokens.size(),
-                false,
-                true
-                );
-        }
-
-        if(n_tokens!=tokens.size())
-            tokens.resize(n_tokens);
-
-        return tokens;
-    };
-
-    auto generatebatch = [&batchs](int curtokensize,std::vector<llama_token>& tokens,uint32_t maxbatchsize)->bool{
-        uint32_t goaltokensize = curtokensize + tokens.size();
-        uint32_t loadpos = 0;
-        while(curtokensize < goaltokensize)
-        {
-            uint32_t newpos = min(curtokensize + maxbatchsize , goaltokensize);
-
-            uint32_t batchlen = newpos - curtokensize;
-            llama_batch batch = llama_batch_init(batchlen, 0, 1);
-
-            if (batch.token == nullptr) {
-                qDebug() << "Failed to initialize batch";
-                return false;
-            }
-
-            for (int i = loadpos; i < loadpos + batchlen; i++) {
-                batch.token[batch.n_tokens] = tokens[i];
-                batch.pos[batch.n_tokens] = curtokensize + i;
-                batch.n_seq_id[batch.n_tokens] = 1;
-                batch.seq_id[batch.n_tokens][0] = default_seq_id;
-                batch.logits[batch.n_tokens] = (i == tokens.size() - 1) ? 1 : 0;  // 最后一个输出logits
-                batch.n_tokens++;
-            }
-            curtokensize = newpos;
-
-            batchs.emplace_back(batch);
-        }
-        return true;
-    };
-
-    std::string addprompt;
-    std::vector<llama_token> addtokens;
-    int newtokensuse = 0;
-    if(m_ctx)
+    if(newtokensuse < window_size)    //新的token加入仍然不会使得ctx超过上下文限制，直接增量处理
     {
-        addprompt = getaddprmpt(task);
-        addtokens = gettokenize(addprompt);
-        newtokensuse = addtokens.size() + m_curtokens.size();
-    }
-
-    if(m_ctx && newtokensuse < m_window_size)    //新的token加入仍然不会使得ctx超过上下文限制，直接增量生成
-    {
-        generatebatch(m_curtokens.size(),addtokens,llama_n_batch(m_ctx));
         m_curtokens.insert(m_curtokens.end(),addtokens.begin(),addtokens.end());
     }
-    else   //新的token加入导致ctx超过上下文限制，重置ctx，重新整理聊天记录
+    else   //新的token加入导致ctx超过上下文限制，重置ctx，重建prompt
     {
         resetcontext();
-
         const std::string prompt = buildQwenPrompt(true,task.needthinking);
-        std::vector<llama_token> tokens = gettokenize(prompt);
-
-        generatebatch(m_curtokens.size(),tokens,llama_n_batch(m_ctx));
-        m_curtokens.insert(m_curtokens.end(),tokens.begin(),tokens.end());
+        m_curtokens = gettokenize(prompt,m_vocab);
     }
     return true;
 }
@@ -640,7 +687,7 @@ llama_sampler* LlamaModel::getsampler()
 void LlamaModel::clearcontext()
 {
     m_curtokens.clear();
-    m_decodepos = 0;
+    m_todecodepos = 0;
     if(m_ctx)
     {
         llama_free(m_ctx);
@@ -656,7 +703,7 @@ void LlamaModel::clearcontext()
 void LlamaModel::resetcontext()
 {
     m_curtokens.clear();
-    m_decodepos = 0;
+    m_todecodepos = 0;
 
     if(m_ctx)
     {
@@ -681,11 +728,13 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
 
     if(!task.iscontinuetask)
     {
-        if(!preprocess(task,task.batchs))
+        if(!preprocess(task))
         {
             qDebug()<<"llama preprocess error!";
             return false;
         }
+        task.firstoutputthinkingtext = true;
+        task.firstoutputtalkingtext = true;
     }
     else
         task.iscontinuetask = false;
@@ -699,8 +748,14 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
     bool result = true;
     static int max_gen = 1000;  // 安全限制
 
-    bool shouldbreak = false;
-    for (; task.current_gen < max_gen && !shouldbreak; task.current_gen++)
+    llama_batch batch = llama_batch_init(llama_n_batch(m_ctx) , 0, 1);
+    if (batch.token == nullptr) {
+        qDebug() << "Failed to initialize batch";
+        return false;
+    }
+    int btachlen = llama_n_batch(m_ctx);
+
+    for (; task.current_gen < max_gen; task.current_gen++)
     {
         if(shouldpause)
         {
@@ -709,100 +764,59 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
             break;
         }
 
-        for(int i=0; i < task.batchs.size()&& !shouldbreak;)
+        btachlen = GetBatchToProcess(batch,btachlen);
+        if(btachlen <= 0)
         {
-            llama_batch batch = task.batchs[i];
-            // 解码
-            int decode_result = llama_decode(m_ctx, batch);
-            if (decode_result != 0) {
-                qDebug()<<"Error: decode error";
-                result = false;
-                shouldbreak = true;
+            result = false;
+            break;
+        }
+
+        // 解码
+        int decode_result = llama_decode(m_ctx, batch);
+        if (decode_result != 0) {
+            qDebug()<<"Error: decode error";
+            result = false;
+            break;
+        }
+
+        m_todecodepos += batch.n_tokens;
+
+        if(batch.logits[batch.n_tokens - 1] == 1)
+        {
+             // 采样
+            task.next_token = llama_sampler_sample(m_sampler, m_ctx, -1);
+
+            bool shouldstop = shouldStopGeneration(task.next_token,task.output);
+
+            llama_sampler_accept(m_sampler, task.next_token);
+
+            m_curtokens.emplace_back(task.next_token);
+
+            if(shouldstop)
+            {
+                qDebug()<< "StoppingGeneration shouldend";
                 break;
             }
 
-            m_decodepos += task.batchs[i].n_tokens;
-
-            if(batch.logits[batch.n_tokens - 1] != 1)
-            {
-                llama_batch_free(batch);
-                task.batchs.erase(task.batchs.begin()+i);
-                continue;
+            // 反标记化
+            char deprompt[100] = {0};
+            if(llama_detokenize(m_vocab, &task.next_token, 1, deprompt, sizeof(deprompt), false, true) < 0){
+                qDebug()<<"Error: detokenize error";
+                result = false;
+                break;
             }
-            else
-            {
-                 // 采样
-                task.next_token = llama_sampler_sample(m_sampler, m_ctx, -1);
 
-                bool shouldstop = shouldStopGeneration(task.next_token,task.output);
+            task.output.append(deprompt);
 
-                llama_sampler_accept(m_sampler, task.next_token);
-
-                if(shouldstop)
-                {
-                    qDebug()<< "StoppingGeneration shouldend";
-                    shouldbreak = true;
-                    break;
-                }
-
-                m_curtokens.emplace_back(task.next_token);
-
-                // 反标记化
-                char deprompt[100] = {0};
-                if(llama_detokenize(m_vocab, &task.next_token, 1, deprompt, sizeof(deprompt), false, true) < 0){
-                    qDebug()<<"Error: detokenize error";
-                    result = false;
-                    shouldbreak = true;
-                    break;
-                }
-
-                task.output.append(deprompt);
-
-                if(outputchangecallback)
-                    outputchangecallback();
-
-                if(task.batchs.size()==1)
-                {
-                    auto& nexttask = task.batchs[0];
-                    // 重置batch用于下一个token（不清空内存，只重置计数器）
-                    nexttask.n_tokens = 0;  // 重置，重用已分配的内存
-                    // 添加新生成的token
-                    nexttask.token[0] = task.next_token;
-                    nexttask.pos[0] = m_decodepos;
-                    nexttask.n_seq_id[0] = 1;
-                    nexttask.seq_id[0][0] = default_seq_id;
-                    nexttask.logits[0] = 1;  // 需要输出logits用于下一次采样
-                    nexttask.n_tokens = 1;
-                }
-                else
-                {
-                    auto nexttask = llama_batch_init(1, 0, 1);
-                    nexttask.n_tokens = 0;
-                    // 添加新生成的token
-                    nexttask.token[0] = task.next_token;
-                    nexttask.pos[0] = m_decodepos;
-                    nexttask.n_seq_id[0] = 1;
-                    nexttask.seq_id[0][0] = default_seq_id;
-                    nexttask.logits[0] = 1;  // 需要输出logits用于下一次采样
-                    nexttask.n_tokens = 1;
-                    task.batchs.emplace_back(nexttask);
-
-                    llama_batch_free(batch);
-                    task.batchs.erase(task.batchs.begin()+i);
-                    continue;
-                }
-            }
-            i++;
+            if(outputchangecallback)
+                outputchangecallback();
         }
     }
 
+    llama_batch_free(batch);
+
     if (!task.iscontinuetask)
     {
-        for(int i=0;i<task.batchs.size();i++)
-        {
-            llama_batch_free(task.batchs[i]);
-        }
-        task.batchs.clear();
         task.next_token = LLAMA_TOKEN_NULL;
         task.current_gen = 0;
     }
@@ -839,6 +853,14 @@ LlamaModel::~LlamaModel() {
         llama_free((llama_context*)m_ctx);
         m_ctx = nullptr;
     }
+    if(m_sampler)
+    {
+        llama_sampler_free(m_sampler);
+        m_sampler = nullptr;
+    }
+    if (!m_vocab) {
+        m_vocab = nullptr;
+    }
     if (m_model) {
         llama_model_free((llama_model*)m_model);
         m_model = nullptr;
@@ -854,10 +876,8 @@ void LlamaModel::inputText(QString text, bool thinkingEnabled)
         return;
 
 
-    if (!m_inputtask.empty()) {
+    if (!m_inputtask.empty())
         ClearPausedTask();
-        clearcontext();
-    }
 
     AITask task;
     task.userinput = text.toStdString();
@@ -944,11 +964,11 @@ std::string LlamaModel::buildQwenPrompt(bool add_generation_prompt,bool enable_t
         }
     }
 
-    int m_n_ctx = llama_n_ctx(m_ctx);          // 模型总容量
-    int m_safety_margin = 200;
-    int m_window_size = m_n_ctx - 1000 - m_safety_margin;  // 滑动窗口大小（记忆量）
+    int n_ctx = llama_n_ctx(m_ctx);          // 模型总容量
+    int safety_margin = 200;
+    int window_size = min(n_ctx / 2, n_ctx - 1000 - safety_margin);  // 滑动窗口大小（记忆量）
 
-    if(m_window_size < 0)
+    if(window_size < 0)
         return "";
 
     int curtokensize = 0;
@@ -966,7 +986,7 @@ std::string LlamaModel::buildQwenPrompt(bool add_generation_prompt,bool enable_t
             break;
 
         const auto& msg = messages[i];
-        if(curtokensize + msg.tokensize > m_window_size)
+        if(curtokensize + msg.tokensize > window_size)
         {
             startIndex = i + 1;
             break;  //达到滑动窗口大小，舍弃前面的记忆

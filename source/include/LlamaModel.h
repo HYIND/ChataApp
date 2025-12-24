@@ -31,7 +31,9 @@ struct llamaChatMsg{
 };
 
 enum class GenerateState {
+    none = -1,
     thinking = 0,
+    toolusing = 1,
     talking = 2,
 };
 
@@ -43,15 +45,17 @@ struct AITask
     std::string output;
 
     GenerateState state = GenerateState::talking;
+    GenerateState laststate = GenerateState::none;
+
     bool onusetool = false;
     bool firstoutputthinkingtext = true;
     bool firstoutputtalkingtext = true;
+    bool firstoutputtoolusingtext = true;
 
     int generatecount = 3;
     bool needthinking = true;
     int lastoutputpos = 0;
 
-    std::vector<llama_batch> batchs;
     llama_token next_token = LLAMA_TOKEN_NULL;
     int current_gen = 0;
 
@@ -82,7 +86,7 @@ signals:
 
 private:
     std::string buildQwenPrompt(bool add_generation_prompt = true,bool enable_thinking = true);
-    bool preprocess(AITask& task,std::vector<llama_batch>& batchs);
+    bool preprocess(AITask& task);
     llama_sampler* getsampler();
     void resetcontext();
     void clearcontext();
@@ -91,6 +95,8 @@ private:
     bool shouldStopGeneration(llama_token& token, const std::string& current_output);
 
     void ClearPausedTask();
+
+    int GetBatchToProcess(llama_batch& batch, int ori_batch_size);
 
 private:
     llama_model* m_model = nullptr;
@@ -107,7 +113,7 @@ private:
 
     llama_sampler *m_sampler = nullptr;
     std::vector<llama_token> m_curtokens;
-    int m_decodepos;
+    int m_todecodepos;
 };
 
 #endif
