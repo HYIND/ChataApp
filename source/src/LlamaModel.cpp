@@ -6,7 +6,7 @@
 #include <QDebug>
 #include "LlamaToolHelper.h"
 
-static int global_n_ctx = 10000;
+static int global_n_ctx = 8192;
 
 int64_t GetTimestampMilliseconds()
 {
@@ -111,7 +111,7 @@ Important: Once you have finished thinking, you must immediately take one of the
 4. You should never reveal the name of your tool to users.
 )";
 
-std::string stringreplace(const std::string& str,
+static std::string stringreplace(const std::string& str,
                     const std::string& from,
                     const std::string& to) {
     std::string result = str;
@@ -159,6 +159,17 @@ bool containsToolCall(const std::string& text) {
 std::vector<ToolCall> parseToolCall(const std::string& text) {
     std::vector<ToolCall> result;
     size_t find_pos = 0;
+
+    auto isrepeat = [](std::vector<ToolCall>& vec, ToolCall& elment)-> bool
+    {
+        for(auto &call: vec)
+        {
+            if(call.is_same_as(elment))
+                return true;
+        }
+        return false;
+    };
+
     do{
         size_t start_pos = text.find("<tool_call>",find_pos);
         size_t end_pos = text.find("</tool_call>",find_pos);
@@ -168,8 +179,9 @@ std::vector<ToolCall> parseToolCall(const std::string& text) {
             // 移除空白字符
             json_str.erase(0, json_str.find_first_not_of(" \n\r\t"));
             json_str.erase(json_str.find_last_not_of(" \n\r\t") + 1);
-            json_str = stringreplace(json_str,"\n","\\n");
-            result.emplace_back(ToolCall::from_json(json_str));
+            auto toolcall = ToolCall::from_json(json_str);
+            if(!isrepeat(result,toolcall))
+                result.emplace_back(toolcall);
             find_pos = end_pos + sizeof("</tool_call>") - 1;
         }
         else
@@ -292,7 +304,7 @@ void LlamaModel::ClearPausedTask()
     AITask quetask;
     while(m_inputtask.front(quetask))
     {
-        if(quetask.iscontinuetask)
+        if(quetask.taskstate != TaskState::Normal)
         {
             if(!quetask.output.empty())
             {
@@ -385,7 +397,7 @@ bool LlamaModel::load(const std::string& model_path) {
 bool LlamaModel::processTask(AITask &task)
 {
 
-    if(!task.iscontinuetask)
+    if(task.taskstate == TaskState::Normal)
     {
         llamaChatMsg msg("user",task.userinput);
         msg.usethinking = task.needthinking;
@@ -396,111 +408,180 @@ bool LlamaModel::processTask(AITask &task)
 
     auto outputchange = [&]()->void{
         int outputpos = task.output.length();
-        std::string delta(task.output.begin()+lastoutputpos,task.output.begin()+outputpos);
+        std::string trimstring(task.output.begin()+lastoutputpos,task.output.begin()+outputpos);
 
-        if(task.state != GenerateState::thinking && delta.find("<think>") != std::string::npos)
-        {
-            if(task.laststate == GenerateState::none)
-                delta = "-----------------think start-----------------\n\n";
-            else
-                delta = "\n\n-----------------think start-----------------\n\n";
-            QString outputdelta = QString::fromStdString(delta);
-            emit outputText(outputdelta, 1);
+        auto slipttext = [](const std::string& text)-> std::vector<std::string> {
+            static std::vector<std::string> keystip = {
+                "<think>",
+                "</think>",
+                "<tool_call>",
+                "</tool_call>"
+            };
 
-            task.laststate = task.state;
-            task.state = GenerateState::thinking;
-            task.firstoutputthinkingtext = true;
+            std::vector<std::string> paragraphs;
+            size_t pos = 0;
 
-            lastoutputpos = outputpos;
-            return;
-        }
-        if(task.state == GenerateState::thinking && delta.find("</think>") != std::string::npos)
-        {
-            delta = "\n\n-----------------think over-----------------\n\n";
-            QString outputdelta = QString::fromStdString(delta);
-            emit outputText(outputdelta, 1);
+            while (pos < text.length()) {
+                // 查找下一个关键标签的位置
+                size_t next_tag_pos = std::string::npos;
+                std::string found_tag;
 
-            task.laststate = task.state;
-            task.state = GenerateState::talking;
+                for (const auto& tag : keystip) {
+                    size_t tag_pos = text.find(tag, pos);
+                    if (tag_pos != std::string::npos) {
+                        if (next_tag_pos == std::string::npos || tag_pos < next_tag_pos) {
+                            next_tag_pos = tag_pos;
+                            found_tag = tag;
+                        }
+                    }
+                }
 
-            lastoutputpos = outputpos;
-            return;
-        }
-        if(delta.find("<tool_call>") != std::string::npos)
-        {
-            if(!task.onusetool)
-                task.onusetool = true;
+                if (next_tag_pos == std::string::npos) {
+                    // 没有更多标签，添加剩余部分
+                    if (pos < text.length()) {
+                        std::string remaining = text.substr(pos);
+                        if (!remaining.empty()) {
+                            paragraphs.push_back(remaining);
+                        }
+                    }
+                    break;
+                }
 
-            if(
-                (task.state == GenerateState::thinking && task.firstoutputthinkingtext) ||
-                (task.state == GenerateState::talking && task.firstoutputtalkingtext)
-                )
-                delta = "------------toolcall start------------\n";
-            else
-            {
-                delta = "\n------------toolcall start------------\n";
+                // 添加标签前的内容（如果有）
+                if (next_tag_pos > pos) {
+                    std::string before_tag = text.substr(pos, next_tag_pos - pos);
+                    if (!before_tag.empty()) {
+                        paragraphs.push_back(before_tag);
+                    }
+                }
+
+                // 添加标签本身
+                paragraphs.push_back(found_tag);
+
+                // 更新位置到标签结束处
+                pos = next_tag_pos + found_tag.length();
             }
-            QString outputdelta = QString::fromStdString(delta);
-            emit outputText(outputdelta, 1);
 
-            task.laststate = task.state;
-            task.state = GenerateState::toolusing;
-            task.firstoutputtoolusingtext = true;
+            return paragraphs;
+        };
 
-            lastoutputpos = outputpos;
-            return;
-        }
-        if(task.state == GenerateState::toolusing && delta.find("</tool_call>") != std::string::npos)
+        std::vector<std::string> texts = slipttext(trimstring);
+
+        for(int i=0; i<texts.size(); i++)
         {
-            task.state = task.laststate;
-            task.laststate = GenerateState::toolusing;
-
-            delta = "\n------------toolcall over------------\n";
-            QString outputdelta = QString::fromStdString(delta);
-            emit outputText(outputdelta, 1);
-
-            lastoutputpos = outputpos;
-            return;
-        }
-
-        if(task.state == GenerateState::thinking)
-        {
-            if(task.firstoutputthinkingtext)
-                delta = trimLeadingWhitespace(delta);
-            if(!delta.empty() && isStringEndsWithCompleteUTF8(delta))
+            std::string delta = texts[i];
+            uint32_t oristrlen = delta.length();
+            if(task.state != GenerateState::thinking && delta.find("<think>") != std::string::npos)
             {
+                if(task.laststate == GenerateState::none)
+                    delta = "-----------------think start-----------------\n\n";
+                else
+                    delta = "\n\n-----------------think start-----------------\n\n";
                 QString outputdelta = QString::fromStdString(delta);
                 emit outputText(outputdelta, 1);
-                task.firstoutputthinkingtext = false;
-                lastoutputpos = outputpos;
+
+                task.laststate = task.state;
+                task.state = GenerateState::thinking;
+                task.firstoutputthinkingtext = true;
+
+                lastoutputpos += oristrlen;
+                continue;
             }
-        }
-        else if(task.state == GenerateState::talking)
-        {
-            if(task.firstoutputtalkingtext)
-                delta = trimLeadingWhitespace(delta);
-            if(!delta.empty() && isStringEndsWithCompleteUTF8(delta))
+            if(task.state == GenerateState::thinking && delta.find("</think>") != std::string::npos)
             {
+                delta = "\n\n-----------------think over-----------------\n\n";
                 QString outputdelta = QString::fromStdString(delta);
                 emit outputText(outputdelta, 1);
-                task.firstoutputtalkingtext = false;
-                lastoutputpos = outputpos;
+
+                task.laststate = task.state;
+                task.state = GenerateState::talking;
+
+                lastoutputpos += oristrlen;
+                continue;
             }
-        }
-        else if(task.state == GenerateState::toolusing)
-        {
-            if(task.firstoutputtoolusingtext)
-                delta = trimLeadingWhitespace(delta);
-            if(!delta.empty() && isStringEndsWithCompleteUTF8(delta))
+            if(delta.find("<tool_call>") != std::string::npos)
             {
+                if(!task.onusetool)
+                    task.onusetool = true;
+
+                if(
+                    (task.state == GenerateState::thinking && task.firstoutputthinkingtext) ||
+                    (task.state == GenerateState::talking && task.firstoutputtalkingtext)
+                    )
+                    delta = "------------toolcall start------------\n";
+                else
+                {
+                    delta = "\n------------toolcall start------------\n";
+                }
                 QString outputdelta = QString::fromStdString(delta);
                 emit outputText(outputdelta, 1);
-                task.firstoutputtalkingtext = false;
-                lastoutputpos = outputpos;
+
+                task.laststate = task.state;
+                task.state = GenerateState::toolusing;
+                task.firstoutputtoolusingtext = true;
+
+                lastoutputpos += oristrlen;
+                continue;
+            }
+            if(task.state == GenerateState::toolusing && delta.find("</tool_call>") != std::string::npos)
+            {
+                task.state = task.laststate;
+                task.laststate = GenerateState::toolusing;
+
+                delta = "\n------------toolcall over------------\n";
+                QString outputdelta = QString::fromStdString(delta);
+                emit outputText(outputdelta, 1);
+
+                lastoutputpos += oristrlen;
+                continue;
+            }
+
+            if(task.state == GenerateState::thinking)
+            {
+                if(task.firstoutputthinkingtext)
+                    delta = trimLeadingWhitespace(delta);
+                if(!delta.empty())
+                {
+                    if(i == texts.size()-1 && !isStringEndsWithCompleteUTF8(delta))
+                        break;
+                    QString outputdelta = QString::fromStdString(delta);
+                    emit outputText(outputdelta, 1);
+                    task.firstoutputthinkingtext = false;
+                    lastoutputpos += oristrlen;
+                }
+            }
+            else if(task.state == GenerateState::talking)
+            {
+                if(task.firstoutputtalkingtext)
+                    delta = trimLeadingWhitespace(delta);
+                if(!delta.empty())
+                {
+                    if(i == texts.size()-1 && !isStringEndsWithCompleteUTF8(delta))
+                        break;
+                    QString outputdelta = QString::fromStdString(delta);
+                    emit outputText(outputdelta, 1);
+                    task.firstoutputtalkingtext = false;
+                    lastoutputpos += oristrlen;
+                }
+            }
+            else if(task.state == GenerateState::toolusing)
+            {
+                if(task.firstoutputtoolusingtext)
+                    delta = trimLeadingWhitespace(delta);
+                if(!delta.empty())
+                {
+                    if(i == texts.size()-1 && !isStringEndsWithCompleteUTF8(delta))
+                        break;
+                    QString outputdelta = QString::fromStdString(delta);
+                    emit outputText(outputdelta, 1);
+                    task.firstoutputtalkingtext = false;
+                    lastoutputpos += oristrlen;
+                }
             }
         }
     };
 
+    task.generatecount = 3;
     while(task.generatecount-->0)
     {
         if(generate(task,outputchange))
@@ -519,14 +600,21 @@ bool LlamaModel::processTask(AITask &task)
 
                     trimresponse = stringreplace(trimresponse,"\\n","\n");
                     processToolCall(task,trimresponse);
-                    if (task.generatecount<=1)
+                    // if (task.generatecount<=1)
+                    // {
+                    //     task.needthinking = false;
+                    //     // 更新prompt，加入工具的回复信息，最后一次输出取消思考，加入prompt确保有内容输出给用户
+                    //     task.extraprompt = "基于我的思考，我应该说:";
+                    // }
+                    // else
                     {
-                        task.needthinking = false;
-                        // 更新prompt，加入工具的回复信息，最后一次输出取消思考，加入prompt确保有内容输出给用户
-                        task.extraprompt = "基于我的思考，我应该说:";
+                        if(task.needthinking)
+                            task.extraprompt = "接下来我要查询刚刚的工具调用情况，然后执行下一步动作.";
+                        else
+                            task.extraprompt = "基于刚刚的工具调用情况，我应该说:";
                     }
                 }
-                task.onusetool =false;
+                task.onusetool = false;
             }
             else
             {
@@ -542,25 +630,33 @@ bool LlamaModel::processTask(AITask &task)
                     emit outputText(outputtext, 0);
                     return true;
                 }
-                else    // 没有输出实质内容
-                {
-                    task.needthinking = false;
-                    // 取消思考，加入prompt确保有内容输出给用户
-                    task.extraprompt = "基于我的思考，我应该说:";
-                }
+                // else    // 没有输出实质内容
+                // {
+                //     task.needthinking = false;
+                //     // 取消思考，加入prompt确保有内容输出给用户
+                //     task.extraprompt = "基于我的思考，我应该说:";
+                // }
             }
         }
         else
         {
-            if(task.iscontinuetask)
+            if(task.taskstate != TaskState::Normal)
             {
                 task.generatecount++;
                 m_inputtask.enqueue(task);
                 emit outputText("", 2);
             }
-            return false;
+            return true;
         }
         task.state = GenerateState::talking;
+    }
+    if(task.generatecount <= 0)
+    {
+        task.taskstate = TaskState::MaxGenCountPause;
+        m_inputtask.enqueue(task);
+        shouldpause = true;
+        emit outputText("", 2);
+        return true;
     }
     emit outputText("", 0);
     return false;
@@ -614,7 +710,16 @@ bool LlamaModel::preprocess(AITask& task)
     {
         // ctx不存在时，直接重建prompt
         resetcontext();
-        const std::string prompt = buildQwenPrompt(true,task.needthinking);
+        std::string prompt = buildQwenPrompt(true,task.needthinking);
+        std::ostringstream oss;
+        if(!task.toolsmsg.empty())
+            task.toolsmsg.clear();
+        if(!task.extraprompt.empty())
+        {
+            prompt += task.extraprompt;
+            task.extraprompt = "";
+        }
+
         m_curtokens = gettokenize(prompt,m_vocab);
         return true;
     }
@@ -646,7 +751,13 @@ bool LlamaModel::preprocess(AITask& task)
         }
         if(!task.extraprompt.empty())
         {
-            oss << task.extraprompt;
+            if (!task.needthinking)
+                oss << task.extraprompt;
+            else
+            {
+                oss << "<think>\n" << task.extraprompt;
+                task.output += "<think>\n";
+            }
             task.extraprompt = "";
         }
 
@@ -726,7 +837,7 @@ void LlamaModel::resetcontext()
 bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallback) {
     if (!m_loaded) return false;
 
-    if(!task.iscontinuetask)
+    if(task.taskstate == TaskState::Normal || task.taskstate == TaskState::MaxGenCountPause)
     {
         if(!preprocess(task))
         {
@@ -736,8 +847,14 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
         task.firstoutputthinkingtext = true;
         task.firstoutputtalkingtext = true;
     }
-    else
-        task.iscontinuetask = false;
+    else /*if(task.taskstate == TaskState::ManualPause || task.taskstate == TaskState::MaxGenTokenPause)*/
+    {
+        task.current_gen = 0;
+    }
+
+    if(task.taskstate != TaskState::Normal)
+        task.taskstate = TaskState::Normal;
+
 
     // qDebug() << "Starting generate with:";
     // qDebug() << "  n_ctx =" << llama_n_ctx(m_ctx);
@@ -745,8 +862,8 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
     // qDebug() << "  prompt length =" << task.prompt.length();
 
     // 4. 循环解码采样
-    bool result = true;
-    static int max_gen = 1000;  // 安全限制
+    bool result = false;
+    static int max_gen = 800;  // 安全限制
 
     llama_batch batch = llama_batch_init(llama_n_batch(m_ctx) , 0, 1);
     if (batch.token == nullptr) {
@@ -760,7 +877,7 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
         if(shouldpause)
         {
             result = false;
-            task.iscontinuetask = true;
+            task.taskstate = TaskState::ManualPause;
             break;
         }
 
@@ -795,6 +912,7 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
             if(shouldstop)
             {
                 qDebug()<< "StoppingGeneration shouldend";
+                result = true;
                 break;
             }
 
@@ -813,9 +931,15 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
         }
     }
 
+    if(!result && task.current_gen >= max_gen)
+    {
+        shouldpause = true;
+        task.taskstate = TaskState::MaxGenTokenPause;
+    }
+
     llama_batch_free(batch);
 
-    if (!task.iscontinuetask)
+    if (task.taskstate == TaskState::Normal || task.taskstate == TaskState::MaxGenCountPause)
     {
         task.next_token = LLAMA_TOKEN_NULL;
         task.current_gen = 0;
@@ -1065,15 +1189,31 @@ void LlamaModel::processToolCall(AITask& task, const std::string &string)
     // 解析工具调用
     std::vector<ToolCall> tool_calls = parseToolCall(string);
 
+    auto gettoolsoutput = [](std::vector<std::string> results)-> std::string
+    {
+        std::string str = "\n\n-----------toolcall result-----------\n";
+        for(auto &result :results)
+        {
+            str += result;
+            str += "\n";
+        }
+        str+= "---------toolcall result over---------\n";
+        return str;
+    };
+
+    std::vector<std::string> results;
     for(auto &tool_call:tool_calls)
     {
         ToolResult tool_result = ToolExecutor::execute(tool_call);
+        results.emplace_back(tool_result.result_str);
         std::string tool_response = formatToolResponse(tool_result.result_str);
         int64_t out_time = GetTimestampMilliseconds() + ((int64_t)tool_result.ttl_second) * 1000;
         qDebug()<<"toolcall:" << QString::fromUtf8(tool_call.to_json()) <<"\nresponse"<<QString::fromUtf8(tool_result.result_str);
         m_chathistory.emplace_back("tool", tool_response, "", out_time, true);
         task.toolsmsg.emplace_back("tool", tool_response, "", out_time, true);
     }
+    if(!results.empty())
+        task.output += gettoolsoutput(results);
 }
 
 void LlamaModel::pauseGenerate()

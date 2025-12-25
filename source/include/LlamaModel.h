@@ -37,6 +37,14 @@ enum class GenerateState {
     talking = 2,
 };
 
+enum class TaskState
+{
+    Normal = 0,
+    ManualPause = 1,         //手动暂停
+    MaxGenTokenPause = 2,    //单次生成token限制暂停
+    MaxGenCountPause = 3,   //单任务循环多次生成次数限制暂停
+};
+
 struct AITask
 {
     std::string userinput; //用于增量更新
@@ -59,7 +67,7 @@ struct AITask
     llama_token next_token = LLAMA_TOKEN_NULL;
     int current_gen = 0;
 
-    bool iscontinuetask = false;
+    TaskState taskstate = TaskState::Normal;
 };
 
 class LlamaModel :public QObject{

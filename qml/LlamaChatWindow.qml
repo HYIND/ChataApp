@@ -5,7 +5,7 @@ import QtQuick.Layouts
 Window {
 
     property var model
-    property int state:0    //0空闲 1推理中 2输出中 3用户停止
+    property int state:0    //0空闲 1推理中 2输出中 3暂停
     property var lastaimessagebubble:null
     property bool thinkingEnabled: false
 
@@ -284,11 +284,26 @@ Window {
                         width: 6
                         policy: ScrollBar.AsNeeded
 
+                        background: Rectangle {
+                            color: "transparent"
+                        }
+
                         contentItem: Rectangle {
                             implicitWidth: 6
                             radius: 3
                             color: "#1abc9c"
                             z : 10
+
+                            // transform: [
+                            //     Scale {
+                            //         yScale: (height + 32) / height
+                            //         origin.y: 0
+                            //     },
+                            //     Translate {
+                            //         y:-14
+                            //     }
+                            // ]
+
                             opacity:
                             {
                                 if (chatscrollbar.pressed) {
@@ -565,7 +580,7 @@ Window {
                             border.width: 2
                             color: "transparent"
                             visible: bubbleitem == mainWindow.lastaimessagebubble &&
-                                     (mainWindow.state == 1 || mainWindow.state == 2 || mainWindow.state == 3)
+                                     (mainWindow.state != 0)
 
                             Text {
                                 id: controlpausetips
@@ -601,7 +616,7 @@ Window {
                         border.width: 2
                         color: "transparent"
                         visible: bubbleitem == mainWindow.lastaimessagebubble &&
-                                 (mainWindow.state == 0 || mainWindow.state == 3)
+                                 (mainWindow.state != 1 && mainWindow.state != 2)
 
                         Text {
                             id: controlregentips
@@ -683,7 +698,7 @@ Window {
 
     Connections {
         target: model
-        function onoutputText(text,operation) { //0结束 1输出内容 2暂停
+        function onoutputText(text,operation) { //0结束 1输出内容 2手动暂停 3
             if(operation == 1)
             {
                 if(state == 3)

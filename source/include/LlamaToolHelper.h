@@ -19,6 +19,8 @@ struct ToolCall {
 
     std::string to_json() const;
     static ToolCall from_json(const std::string& jsonStr);
+
+    bool is_same_as(const ToolCall& other) const;
 };
 
 struct ToolResult {

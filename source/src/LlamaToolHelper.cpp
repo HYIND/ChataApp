@@ -4,11 +4,27 @@
 #include "ModelManager.h"
 #include "nlohmann/json.hpp"
 
+static std::string stringreplace(const std::string& str,
+                                 const std::string& from,
+                                 const std::string& to) {
+    std::string result = str;
+    size_t start_pos = 0;
+
+    while ((start_pos = result.find(from, start_pos)) != std::string::npos) {
+        result.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // 避免无限循环
+    }
+
+    return result;
+}
 
 
 std::vector<Tool> available_tools = {
     {"calculator",
-     "Perform calculations between two number. "
+     "Perform calculations with two number. "
+     "When you want to perform basic mathematical calculations,you can use it.  "
+     "calculator can only calculate two numbers at a time.if your expression has more than two numbers to calculate, you need to break it down into multiple steps."
+     "For example,45+49*5,according to the order of operations, you first need to use a tool to calculate the result of 49*5, obtain an intermediate result(the tool returns the intermediate result 245), and then add the intermediate result 245 to 45 to get the final result 290."
      "number1 is the first number. "
      "number2 is the second number. "
      "all number must be enclosed in double quotes. operation can be one of +-*/ operator.",
@@ -35,6 +51,8 @@ ToolCall ToolCall::from_json(const std::string &jsonStr) {
     ToolCall call;
 
     try {
+        const std::string json_str = stringreplace(jsonStr,"\n","\\n");
+
         auto j = nlohmann::json::parse(jsonStr);
 
         // 解析 name
@@ -59,6 +77,19 @@ ToolCall ToolCall::from_json(const std::string &jsonStr) {
     return call;
 }
 
+bool ToolCall::is_same_as(const ToolCall &other) const {
+    if (name != other.name) return false;
+    if (arguments.size() != other.arguments.size()) return false;
+
+    for (const auto& [key, value] : arguments) {
+        auto it = other.arguments.find(key);
+        if (it == other.arguments.end() || it->second != value) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::vector<Tool> ToolExecutor::gettools()
 {
     return available_tools;
@@ -79,7 +110,14 @@ ToolResult ToolExecutor::execute(const ToolCall &call) {
        callresult = R"({"error": "Unknown tool: )" + call.name + R"("})";
     }
 
-    result.result_str=  R"({"toolresult": {"callname":"name","callresult":)" + callresult +R"(}})";
+    // result.result_str=  R"({"toolresult": {"callname":")" + call.name +R"(","callresult":)" + callresult +R"(}})";
+
+    nlohmann::json response;
+    response["toolresult"]["callname"] = call.name;
+    response["toolresult"]["callresult"] = nlohmann::json::parse(stringreplace(callresult,"\n","\\n"));
+    response["toolresult"]["arguments"] = call.arguments; // 包含传入的参数
+
+    result.result_str = response.dump();
 
     for(auto &tool : available_tools)
     {

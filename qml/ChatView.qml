@@ -200,6 +200,7 @@ Item {
                             radius: 3
                             z : 10
                             color: "#1abc9c"
+
                             opacity:
                             {
                                 if (verticalScrollBar.pressed) {
