@@ -20,9 +20,9 @@ static std::string stringreplace(const std::string& str,
 
 
 std::vector<Tool> available_tools = {
-    {"calculator",
+    {"mathematical_calculator",
      "Perform calculations with two number. "
-     "When you want to perform basic mathematical calculations,you can use it.  "
+     "When you need to perform basic mathematical calculations,you can use it.  "
      "calculator can only calculate two numbers at a time.if your expression has more than two numbers to calculate, you need to break it down into multiple steps."
      "For example,45+49*5,according to the order of operations, you first need to use a tool to calculate the result of 49*5, obtain an intermediate result(the tool returns the intermediate result 245), and then add the intermediate result 245 to 45 to get the final result 290."
      "number1 is the first number. "
@@ -30,9 +30,9 @@ std::vector<Tool> available_tools = {
      "all number must be enclosed in double quotes. operation can be one of +-*/ operator.",
      {{"number1","number"},{"number2","number"},{"operation","operators"}},
      300},
-    {"get_time", "Get current Time.", {},7},
-    {"get_user_info","Get information of all current user. You can see who is online, whose IP address, or whose name.",{},15},
-    {"send_message_to","Send a message to receiver. The message content is text and the name is name of receiver. if you want to send content to other, you can use it",{{"receiver","name"},{"text","text"}},20}
+    {"get_current_time", "Get current Time.", {},7},
+    {"get_chatapp_user_info","Get information of all current user. You can see who is online, whose IP address, or whose name.",{},15},
+    {"send_chatapp_message","Send a message to someone. Directly answering user questions does not require using this tool. The message content is text and the name is name of receiver. if you want to send content to other, you can use it",{{"receiver","name"},{"text","text"}},20}
 };
 
 std::string ToolCall::to_json() const {
@@ -53,7 +53,7 @@ ToolCall ToolCall::from_json(const std::string &jsonStr) {
     try {
         const std::string json_str = stringreplace(jsonStr,"\n","\\n");
 
-        auto j = nlohmann::json::parse(jsonStr);
+        auto j = nlohmann::json::parse(json_str);
 
         // 解析 name
         if (j.contains("name") && j["name"].is_string()) {
@@ -94,17 +94,57 @@ std::vector<Tool> ToolExecutor::gettools()
 {
     return available_tools;
 }
+std::string ToolExecutor::gettoolsprompt()
+{
+    std::ostringstream oss;
+
+    oss << "# Tools\n\n";
+    oss << "You may call one or more functions to assist with the user query.\n\n";
+    oss << "Only use tools when the user **explicitly asks for a specific operation** that requires tools.";
+
+    oss << "Core Principle: Never use tools if you can answer directly with language.\n";
+    oss << "Clearly define when to use tools:\n";
+    oss << "1. When the user explicitly requests: \"Calculate\", \"Query\", \"Send\". etc.\n";
+    oss << "2. When real-time data is needed: time, online status, etc.\n";
+    oss << "3. Specific operations that cannot be answered with knowledge.\n";
+    oss << "Absolutely do not using tools in the following situations:\n";
+    oss << "1. Chatting, greetings, everyday conversations\n";
+    oss << "2. Knowledge explanations, clarifications\n";
+    oss << "3. Content creation: writing poems, stories, articles\n";
+    oss << "4. Suggestions, recommendations, analyses\n";
+    oss << "### Judgment Process:\n";
+    oss << "1. What is the user's intent?\n";
+    oss << "2. Can I answer directly?\n";
+    oss << "3. Has the user explicitly requested tools?\n";
+    oss << "4. If not, don't use them.\n";
+    oss << "Remember: Tools are auxiliary; dialogue is the core.\n\n";
+
+    oss << "You are provided with function signatures within <tools></tools> XML tags:\n";
+    oss << "<tools>\n";
+    for (const auto& tool : gettools()) {
+        oss << tool.to_json() << "\n";
+    }
+
+    oss << "</tools>\n\n";
+    oss << "For each function call, return a json object with function name and arguments ";
+    oss << "within <tool_call></tool_call> XML tags:\n";
+    oss << "<tool_call>\n";
+    oss << "{\"name\": <function-name>, \"arguments\": <args-json-object>}\n";
+    oss << "</tool_call>";
+
+    return oss.str();
+}
 
 ToolResult ToolExecutor::execute(const ToolCall &call) {
     ToolResult result;
     std::string callresult;
-    if (call.name == "get_user_info") {
+    if (call.name == "get_chatapp_user_info") {
         callresult = executeGetUserInfo(call);
-    } else if (call.name == "send_message_to") {
+    } else if (call.name == "send_chatapp_message") {
         callresult = executeSendMessage(call);
-    } else if (call.name == "get_time") {
+    } else if (call.name == "get_current_time") {
         callresult = executeGetTime(call);
-    } else if (call.name == "calculator") {
+    } else if (call.name == "mathematical_calculator") {
         callresult = executeCalculator(call);
     } else {
        callresult = R"({"error": "Unknown tool: )" + call.name + R"("})";

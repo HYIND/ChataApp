@@ -105,9 +105,9 @@ std::string system_template = R"(
 You are an helpful AI assistant built into a chat application.
 You are part of the user interface and your respond need to conform to the style of the chat application assistant.
 Important: Once you have finished thinking, you must immediately take one of the following actions:
-1. Call a tool: Use the `<tool_call>` format
+1. If you need call a tool: Use the `<tool_call>` format
 2. For tool such as time, weather, contact information, and message sending, the tool must be invoked again to retrieve the latest data each time.Do not use old data from the conversation history, even if the questions seem the same.
-3. Never do nothing after thinking.
+3. When tools are not needed, respond directly and helpfully.
 4. You should never reveal the name of your tool to users.
 )";
 
@@ -360,21 +360,7 @@ bool LlamaModel::load(const std::string& model_path) {
     oss << system_template << "\n\n";
     const std::vector<Tool>& tools = ToolExecutor::gettools();
     if(!tools.empty())
-    {
-        oss << "# Tools\n\n";
-        oss << "You may call one or more functions to assist with the user query.\n\n";
-        oss << "You are provided with function signatures within <tools></tools> XML tags:\n";
-        oss << "<tools>\n";
-        for (const auto& tool : tools) {
-            oss << tool.to_json() << "\n";
-        }
-        oss << "</tools>\n\n";
-        oss << "For each function call, return a json object with function name and arguments ";
-        oss << "within <tool_call></tool_call> XML tags:\n";
-        oss << "<tool_call>\n";
-        oss << "{\"name\": <function-name>, \"arguments\": <args-json-object>}\n";
-        oss << "</tool_call>";
-    }
+        oss << ToolExecutor::gettoolsprompt();
     oss << "<|im_end|>\n";
 
     m_chathistory.emplace_back(
@@ -786,10 +772,10 @@ llama_sampler* LlamaModel::getsampler()
     llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
     llama_sampler *sampler = llama_sampler_chain_init(sparams);
     {
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(20));
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.95, 1));
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(35));
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.9, 1));
         llama_sampler_chain_add(sampler, llama_sampler_init_penalties(80,1.2f,0.0f,0.0f));
-        llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.6));
+        llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.75));
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(time(NULL)));
     }
     return sampler;

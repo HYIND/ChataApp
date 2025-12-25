@@ -32,6 +32,7 @@ class ToolExecutor {
 
 public:
     static std::vector<Tool> gettools();
+    static std::string gettoolsprompt();
     static ToolResult execute(const ToolCall& call);
 
 private:
