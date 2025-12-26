@@ -24,7 +24,7 @@ public:
 
 public:
     // 处理消息的入口
-    bool ProcessMsg(BaseNetWorkSession *session, const string &ip, const uint16_t port, const json &js, Buffer &buf);
+    bool ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf);
     bool DistributeMsg(BaseNetWorkSession *session, const json &js, Buffer &buf);
 
 protected:

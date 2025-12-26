@@ -26,7 +26,7 @@ void ConnectManager::callBackRecvMessage(BaseNetWorkSession *basesession, Buffer
 
     bool success = false;
     if (HandleMsg)
-        HandleMsg->ProcessMsg(session, session->GetIPAddr(), session->GetPort(), recv);
+        HandleMsg->ProcessMsg(session, recv);
     if (success)
     {
     }
@@ -40,7 +40,7 @@ void ConnectManager::callBackCloseConnect(BaseNetWorkSession *session)
 
     bool success = false;
     if (HandleLoginUser)
-        HandleLoginUser->Logout(session, "logouttoken", session->GetIPAddr(), session->GetPort());
+        HandleLoginUser->Logout(session, session->GetIPAddr(), session->GetPort());
     if (success)
     {
     }

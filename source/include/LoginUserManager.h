@@ -26,9 +26,9 @@ public:
     // 登录
     bool Login(BaseNetWorkSession *session, string ip, uint16_t port);
     // 登出
-    bool Logout(BaseNetWorkSession *session, string token, string ip, uint16_t port);
+    bool Logout(BaseNetWorkSession *session, string ip, uint16_t port);
     // 验证
-    bool Verfiy(BaseNetWorkSession *session, string token);
+    bool Verfiy(BaseNetWorkSession *session, const string &jwtstr, string &token);
     // 用户登录后返回给用户的登录信息
     bool SendLoginInfo(User *u);
 
@@ -40,6 +40,9 @@ public:
 public:
     static string PublicChatToken();
     static bool IsPublicChat(const string &token);
+
+private:
+    static bool VerfiyJwtToken(const string &jwtstr, string &token);
 
 public:
     void SetMsgManager(MsgManager *m);

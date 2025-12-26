@@ -26,7 +26,7 @@ FileTransManager *FileTransManager::Instance()
     return instance;
 }
 
-bool FileTransManager::ProcessMsg(BaseNetWorkSession *session, const string &ip, const uint16_t port, const json &js, Buffer &buf)
+bool FileTransManager::ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf)
 {
     int command = js.at("command");
     switch (command)
@@ -65,14 +65,15 @@ void FileTransManager::AckTaskReq(BaseNetWorkSession *session, const json &js)
         return;
     if (!js.contains("type") || !js.at("type").is_number_unsigned())
         return;
-    if (!js.contains("token") || !js.at("token").is_string())
+    if (!js.contains("jwt") || !js.at("jwt").is_string())
         return;
 
-    string token = js["token"];
+    string jwtstr = js["jwt"];
     string fileid = js["fileid"];
     string taskid = js["taskid"];
     uint32_t type = js["type"];
-    if (!HandleLoginUser->Verfiy(session, token))
+    string token;
+    if (!HandleLoginUser->Verfiy(session, jwtstr, token))
     {
         return;
     }

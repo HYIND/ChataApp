@@ -7,7 +7,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ../bin)
 include_directories(../ThirdParty)
 include_directories(../ThirdParty/Net/include)
 include_directories(../ThirdParty/publicShare)
+include_directories(../ThirdParty/jwt-cpp)
 include_directories(../source/include)
+include_directories(${OPENSSL_INCLUDE_DIR})
 
 aux_source_directory(../source/src DIR_SRC)
 
@@ -18,6 +20,8 @@ ENDIF()
 # 检查库文件是否存在（调试用）
 message(STATUS "Checking libnet.so at: ${CMAKE_SOURCE_DIR}/../bin/libnet.so")
 message(STATUS "Checking libpublic.so at: ${CMAKE_SOURCE_DIR}/../bin/libpublic.so")
+
+find_package(OpenSSL REQUIRED)
 
 # 定义导入库（绝对路径 + 检查存在性）
 find_library(NET_LIB net PATHS ${CMAKE_SOURCE_DIR}/../bin NO_DEFAULT_PATH)
@@ -46,9 +50,10 @@ add_executable(ChatServer ${DIR_SRC})
 target_link_libraries(ChatServer ${FMT_LIB})
 target_link_libraries(ChatServer ${NET_LIB})
 target_link_libraries(ChatServer ${PUBLIC_LIB})
+target_link_libraries(ChatServer ${OPENSSL_LIBRARIES})
 
 if(URING_LIB)
-target_link_libraries(ChatServer ${URING_LIB})
+    target_link_libraries(ChatServer ${URING_LIB})
 endif()
 
 set(CMAKE_BUILD_TYPE "Debug")

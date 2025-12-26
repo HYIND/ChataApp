@@ -5,10 +5,24 @@
 #include "MessageRecordStore.h"
 #include "FileTransManager.h"
 
+void signal_handler(int sig)
+{
+    if (sig == SIGINT)
+    {
+        StopNetCoreLoop();
+    }
+}
+
 int main()
 {
     // LOGGER->SetLoggerPath("server.log");
     InitNetCore();
+
+    struct sigaction sa;
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
 
     ConnectManager ConnectHost;     // 用以处理连接和收发消息
     LoginUserManager LoginUserHost; // 用于存储当前在线用户

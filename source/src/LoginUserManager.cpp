@@ -1,5 +1,9 @@
 #include "LoginUserManager.h"
 #include "NetWorkHelper.h"
+#include "jwt-cpp/jwt.h"
+
+const std::string jwt_secret = "chatappserver_233333";
+const std::string jwt_iss = "chatappserver";
 
 std::string GenerateSimpleUuid()
 {
@@ -45,18 +49,17 @@ User *GeneratePublicChat()
     return publicchat;
 }
 
-std::string GenerateRandomName(const string& uuid)
+std::string GenerateRandomName(const string &uuid)
 {
     static std::vector<std::string> randomprefix =
-    {
-        "monkey",
-        "rabbit",
-        "puppies",
-        "fox",
-        "goat",
-        "hamster",
-        "squirrel"
-    };
+        {
+            "monkey",
+            "rabbit",
+            "puppies",
+            "fox",
+            "goat",
+            "hamster",
+            "squirrel"};
 
     static std::random_device rd;
     static std::mt19937 gen(rd());
@@ -65,6 +68,20 @@ std::string GenerateRandomName(const string& uuid)
     size_t randomIndex = dis(gen) % randomprefix.size();
 
     return randomprefix[randomIndex] + uuid;
+}
+
+std::string GnenerateJwtStr(User *user)
+{
+    if (!user)
+        return "";
+
+    std::string jwttoken = jwt::create()
+                               .set_issuer(jwt_iss)
+                               .set_type("JWT")
+                               .set_payload_claim("token", jwt::claim(user->token))
+                               .sign(jwt::algorithm::hs256{jwt_secret});
+
+    return jwttoken;
 }
 
 bool LoginUserManager::IsPublicChat(const string &token)
@@ -90,7 +107,7 @@ LoginUserManager::~LoginUserManager()
 
 bool LoginUserManager::Login(BaseNetWorkSession *session, string ip, uint16_t port)
 {
-    bool success = false;
+    bool success = true;
 
     bool exist = false;
     OnlineUsers.EnsureCall(
@@ -119,18 +136,21 @@ bool LoginUserManager::Login(BaseNetWorkSession *session, string ip, uint16_t po
         OnlineUsers.emplace(u);
         if (!SendLoginInfo(u))
         {
+            Logout(session, ip, port);
+            success = false;
         }
-        if (HandleMsgManager)
+        if (success && HandleMsgManager)
         {
-            HandleMsgManager->SendOnlineUserMsg(u->session, u->token, u->ip, u->port);
+            success = HandleMsgManager->SendOnlineUserMsg(u->session, u->token);
+            if (!success)
+                Logout(session, ip, port);
         }
-        success = true;
     }
 
     return success;
 }
 
-bool LoginUserManager::Logout(BaseNetWorkSession *session, string token, string ip, uint16_t port)
+bool LoginUserManager::Logout(BaseNetWorkSession *session, string ip, uint16_t port)
 {
     bool success = false;
 
@@ -153,10 +173,44 @@ bool LoginUserManager::Logout(BaseNetWorkSession *session, string token, string 
     return success;
 }
 
-bool LoginUserManager::Verfiy(BaseNetWorkSession *session, string token)
+bool LoginUserManager::VerfiyJwtToken(const string &jwtstr, string &token)
 {
-    bool success = false;
+    auto decoded = jwt::decode(jwtstr);
+    auto verifier = jwt::verify()
+                        .allow_algorithm(jwt::algorithm::hs256{jwt_secret})
+                        .with_issuer(jwt_iss);
+    try
+    {
+        verifier.verify(decoded);
+    }
+    catch (const jwt::error::token_verification_exception &e)
+    {
+        std::cout << "Invalid jwt token: " << e.what() << std::endl;
+        return false;
+    }
+    try
+    {
+        if (!decoded.has_payload_claim("token"))
+            return false;
+        jwt::claim token_claim = decoded.get_payload_claim("token");
+        if (token_claim.get_type() != jwt::json::type::string)
+            return false;
+        token = token_claim.as_string();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error when get payload from jwt: " << e.what() << std::endl;
+        return false;
+    }
+    return true;
+}
 
+bool LoginUserManager::Verfiy(BaseNetWorkSession *session, const string &jwtstr, string &token)
+{
+    if (!VerfiyJwtToken(jwtstr, token))
+        return false;
+
+    bool success = false;
     OnlineUsers.EnsureCall(
         [&](std::vector<User *> &array) -> void
         {
@@ -170,7 +224,6 @@ bool LoginUserManager::Verfiy(BaseNetWorkSession *session, string token)
                 }
             }
         });
-
     return success;
 }
 
@@ -181,6 +234,7 @@ bool LoginUserManager::SendLoginInfo(User *u)
 
     json js;
     js["command"] = 2000;
+    js["jwt"] = GnenerateJwtStr(u);
     js["token"] = u->token;
     js["name"] = u->name;
     js["ip"] = u->ip;
