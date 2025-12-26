@@ -26,6 +26,11 @@ QHash<int, QByteArray> UserInfoModel::roleNames() const
     return roles;
 }
 
+QString UserInfoModel::userjwt() const
+{
+    return m_jwt;
+}
+
 QString UserInfoModel::usertoken() const
 {
     return m_token;
@@ -39,6 +44,11 @@ QString UserInfoModel::username() const
 QString UserInfoModel::useraddress() const
 {
     return m_address;
+}
+
+void UserInfoModel::setUserJwt(const QString &jwt)
+{
+    m_jwt = jwt;
 }
 
 void UserInfoModel::setUserToken(const QString &token)

@@ -68,7 +68,7 @@ void MsgManager::ProcessMsg(QByteArray* bytes)
 
 void MsgManager::ProcessLoginInfo(const QJsonObject& jsonObj)
 {
-	if (!jsonObj.contains("token") || !jsonObj.contains("name") || !jsonObj.contains("ip") || !jsonObj.contains("port"))
+    if (!jsonObj.contains("jwt") || !jsonObj.contains("token") || !jsonObj.contains("name") || !jsonObj.contains("ip") || !jsonObj.contains("port"))
 	{
 		QJsonDocument doc;
 		doc.setObject(jsonObj);
@@ -77,7 +77,8 @@ void MsgManager::ProcessLoginInfo(const QJsonObject& jsonObj)
 	}
 
 
-	QString token = jsonObj.value("token").toString();
+    QString token = jsonObj.value("token").toString();
+    QString jwt = jsonObj.value("jwt").toString();
 	QString name = jsonObj.value("name").toString();
 	QString ip = jsonObj.value("ip").toString();
 	int port = jsonObj.value("port").toInt();
@@ -87,6 +88,7 @@ void MsgManager::ProcessLoginInfo(const QJsonObject& jsonObj)
 	m_ip = ip;
 	m_port = port;
 
+    USERINFOMODEL->setUserJwt(jwt);
 	USERINFOMODEL->setUserToken(token);
 	USERINFOMODEL->setUserName(name);
 	USERINFOMODEL->setUserAddress(address);

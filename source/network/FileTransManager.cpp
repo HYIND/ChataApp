@@ -229,7 +229,7 @@ void FileTransManager::ReqUploadFile(const QString& fileid)
 	js["fileid"] = fileid.toStdString();
 	js["taskid"] = QUuid::createUuid().toString().toStdString();
 	js["type"] = 1;
-	js["token"] = USERINFOMODEL->usertoken().toStdString();
+    js["jwt"] = USERINFOMODEL->userjwt().toStdString();
 
 	NetWorkHelper::SendMessagePackage(&js);
 }
@@ -241,7 +241,7 @@ void FileTransManager::ReqDownloadFile(const QString& fileid)
 	js["fileid"] = fileid.toStdString();
 	js["taskid"] = QUuid::createUuid().toString().toStdString();
 	js["type"] = 2;
-	js["token"] = USERINFOMODEL->usertoken().toStdString();
+    js["jwt"] = USERINFOMODEL->userjwt().toStdString();
 
 	NetWorkHelper::SendMessagePackage(&js);
 }

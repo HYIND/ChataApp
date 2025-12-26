@@ -23,7 +23,7 @@ void RequestManager::SendMsg(const QString& goaltoken, const MsgType type, const
 
 	QJsonObject jsonObj;
 	jsonObj.insert("command", 1002);
-	jsonObj.insert("token", USERINFOMODEL->usertoken());
+    jsonObj.insert("jwt", USERINFOMODEL->userjwt());
 	jsonObj.insert("goaltoken", goaltoken);
 	jsonObj.insert("type", (int)type);
 	jsonObj.insert("msg", content);
@@ -38,7 +38,7 @@ void RequestManager::SendMsg(const QString& goaltoken, const MsgType type, const
 
 	QJsonObject jsonObj;
 	jsonObj.insert("command", 1002);
-	jsonObj.insert("token", USERINFOMODEL->usertoken());
+    jsonObj.insert("jwt", USERINFOMODEL->userjwt());
 	jsonObj.insert("goaltoken", goaltoken);
 	jsonObj.insert("type", (int)type);
 	jsonObj.insert("msg", content);
@@ -50,7 +50,7 @@ void RequestManager::SendFile(const QString& goaltoken, const QString& filename,
 {
 	QJsonObject jsonObj;
 	jsonObj.insert("command", 1002);
-	jsonObj.insert("token", USERINFOMODEL->usertoken());
+    jsonObj.insert("jwt", USERINFOMODEL->userjwt());
 	jsonObj.insert("goaltoken", goaltoken);
 	jsonObj.insert("type", (int)MsgType::file);
 	jsonObj.insert("msg", "");
@@ -67,7 +67,7 @@ void RequestManager::RequestOnlineUserData()
 {
 	QJsonObject jsonObj;
 	jsonObj.insert("command", 1001);
-	jsonObj.insert("token", USERINFOMODEL->usertoken());
+    jsonObj.insert("jwt", USERINFOMODEL->userjwt());
 
 	NetWorkHelper::SendMessagePackage(&jsonObj);
 }
@@ -82,7 +82,7 @@ void RequestManager::RequestMessageRecord(const QString& goaltoken)
 
 	QJsonObject jsonObj;
 	jsonObj.insert("command", 1003);
-	jsonObj.insert("token", USERINFOMODEL->usertoken());
+    jsonObj.insert("jwt", USERINFOMODEL->userjwt());
 	jsonObj.insert("goaltoken", goaltoken);
 
 	NetWorkHelper::SendMessagePackage(&jsonObj);

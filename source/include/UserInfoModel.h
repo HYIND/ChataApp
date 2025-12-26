@@ -23,10 +23,12 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
 public:
+    QString userjwt() const;
     QString usertoken() const;
     QString username() const;
     QString useraddress() const;
 
+    void setUserJwt(const QString& jwt);
     void setUserToken(const QString& token);
     void setUserName(const QString& name);
     void setUserAddress(const QString& address);
@@ -39,6 +41,7 @@ signals:
     void useraddressChanged();
 
 private:
+    QString m_jwt;
     QString m_token;
     QString m_name;
     QString m_address;
