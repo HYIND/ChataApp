@@ -49,6 +49,8 @@ public:
     static bool Exists(const std::string &path);
     static bool Remove(const std::string &path);
     static bool CreateFolder(const std::string &path);
+    static bool ListFiles(const std::string &path, std::vector<std::string> &filepaths);
+    static bool RenameFile(const std::string &oripath, const std::string &newpath);
 
 private:
     bool CheckOpen() const;

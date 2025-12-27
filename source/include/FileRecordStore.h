@@ -1,6 +1,7 @@
 #pragma once
 
 #include "stdafx.h"
+#include "CriticalSectionLock.h"
 
 // 文件状态枚举
 enum class FileStoreStatus
@@ -16,13 +17,16 @@ struct FileRecord
     std::string fileid;
     FileStoreStatus status;
     std::string md5;
-    std::string path;
     uint64_t filesize;
+    uint64_t timestamp;
+    std::string path;
 
-    FileRecord(std::string id = "", FileStoreStatus s = FileStoreStatus::NOT_UPLOADED,
+    FileRecord(std::string id = "",
+               FileStoreStatus s = FileStoreStatus::NOT_UPLOADED,
                std::string m = "",
                uint64_t size = 0,
-               std::string p = "");
+               uint64_t timestamp = 0,
+               const std::string &p = "");
 };
 
 class FileRecordStore
@@ -58,9 +62,12 @@ private:
     void loadRecords();
     void saveRecords();
 
+    void CleanExpiredFileStore();
+
 private:
     std::string filePath_;
     SafeMap<std::string, FileRecord *> records_;
+    CriticalSectionLock _lock;
 };
 
 #define FILERECORDSTORE FileRecordStore::Instance()

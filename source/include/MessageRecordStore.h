@@ -6,6 +6,7 @@
 
 #include "stdafx.h"
 #include "FileIOHandler.h"
+#include <shared_mutex>
 
 using namespace std;
 
@@ -46,7 +47,14 @@ public:
     void SetEnable(bool value);
 
 private:
+    std::shared_mutex &GetFileMutex(const std::string &filepath);
+    void CleanExpiredMsg();
+
+private:
     MessageRecordStore();
+
+private:
+    std::unordered_map<std::string, std::shared_mutex> _fileMutexes;
     bool enable = true;
 };
 

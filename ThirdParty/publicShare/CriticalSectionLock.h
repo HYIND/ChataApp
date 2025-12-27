@@ -29,3 +29,15 @@ private:
     CRITICAL_SECTION _cs;
 #endif
 };
+
+class LockGuard
+{
+public:
+    LockGuard(CriticalSectionLock &lock, bool istrylock = false);
+    bool isownlock();
+    ~LockGuard();
+
+private:
+    CriticalSectionLock &_lock;
+    bool _isownlock;
+};

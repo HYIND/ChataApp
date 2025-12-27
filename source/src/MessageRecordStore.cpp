@@ -3,6 +3,38 @@
 #include "LoginUserManager.h"
 #include <sys/stat.h>
 #include <unistd.h>
+#include "Timer.h"
+
+static constexpr int64_t msgexpiredseconds = 60 * 60 * 24 * 3; // 消息记录3天过期
+
+static int64_t GetTimeStampSecond()
+{
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    auto second = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+    return second;
+}
+
+inline std::string ConcatPath(const std::string &path1, const std::string &path2)
+{
+    std::string concatpath1, concatpath2;
+    if (!path1.empty())
+    {
+        if (path1[path1.size() - 1] == '/')
+            concatpath1.assign(path1, 0, path1.size() - 1);
+        else
+            concatpath1 = path1;
+    }
+    if (!path2.empty())
+    {
+        if (path2[0] == '/')
+            concatpath2.assign(path2, 1, path2.size() - 1);
+        else
+            concatpath2 = path2;
+    }
+
+    return concatpath1 + '/' + concatpath2;
+}
 
 inline std::string GetMessageRecordDirName()
 {
@@ -23,7 +55,7 @@ inline std::string GetSessionFilePath(const std::string &srctoken,
         std::sort(sorted.begin(), sorted.end());
         filename = sorted[0] + "_" + sorted[1] + "_record";
     }
-    return GetMessageRecordDirName() + filename;
+    return ConcatPath(GetMessageRecordDirName(), filename);
 }
 
 class MsgSerializeHelper
@@ -137,6 +169,9 @@ MessageRecordStore *MessageRecordStore::Instance()
 MessageRecordStore::MessageRecordStore()
 {
     FileIOHandler::CreateFolder(GetMessageRecordDirName());
+    static constexpr uint64_t cleaninterval = 30 * 1000, firstclean = 10 * 1000;
+    auto task = TimerTask::CreateRepeat("CleanExpiredMsgTimer", cleaninterval, std::bind(&MessageRecordStore::CleanExpiredMsg, this), firstclean);
+    task->Run();
 }
 
 bool MessageRecordStore::StoreMsg(const MsgRecord &msg)
@@ -152,6 +187,8 @@ bool MessageRecordStore::StoreMsg(const MsgRecord &msg)
         FileIOHandler::CreateFolder(GetMessageRecordDirName());
 
     string filepath = GetSessionFilePath(msg.srctoken, msg.goaltoken);
+
+    std::unique_lock<std::shared_mutex> filelock(GetFileMutex(filepath));
 
     FileIOHandler handler;
     if (handler.Open(filepath, FileIOHandler::OpenMode::APPEND))
@@ -183,6 +220,8 @@ vector<MsgRecord> MessageRecordStore::FetchAllMsg(const string &srctoken, const 
 
     if (!FileIOHandler::Exists(filepath))
         return result;
+
+    std::shared_lock<std::shared_mutex> filelock(GetFileMutex(filepath));
 
     FileIOHandler handler(filepath, FileIOHandler::OpenMode::READ_ONLY);
 
@@ -229,6 +268,8 @@ vector<MsgRecord> MessageRecordStore::FetchLastMsg(const string &srctoken, const
 
     if (!FileIOHandler::Exists(filepath))
         return result;
+
+    std::shared_lock<std::shared_mutex> filelock(GetFileMutex(filepath));
 
     FileIOHandler handler(filepath, FileIOHandler::OpenMode::READ_ONLY);
 
@@ -280,4 +321,140 @@ vector<MsgRecord> MessageRecordStore::FetchLastMsg(const string &srctoken, const
 void MessageRecordStore::SetEnable(bool value)
 {
     enable = value;
+}
+
+std::shared_mutex &MessageRecordStore::GetFileMutex(const std::string &filepath)
+{
+    return _fileMutexes[filepath];
+}
+
+void MessageRecordStore::CleanExpiredMsg()
+{
+    if (!enable)
+        return;
+
+    try
+    {
+        int64_t currentTime = GetTimeStampSecond();
+
+        int64_t expiredTime = currentTime - msgexpiredseconds;
+
+        std::string recordDir = GetMessageRecordDirName();
+
+        std::vector<std::string> files;
+        if (FileIOHandler::ListFiles(recordDir, files))
+        {
+            for (const auto &filepath : files)
+            {
+                // 只处理以"_record"结尾的文件
+                if (filepath.find("_record") == std::string::npos)
+                    continue;
+
+                // 打开文件读取所有消息
+                std::vector<MsgRecord> readMessages;
+
+                std::unique_lock<std::shared_mutex> filelock(GetFileMutex(filepath));
+
+                FileIOHandler handler(filepath, FileIOHandler::OpenMode::READ_ONLY);
+
+                bool needclean = false;
+
+                long remind = handler.GetSize();
+                long offset = remind;
+
+                while (remind > sizeof(int))
+                {
+                    int lastbuflen = 0;
+
+                    offset -= sizeof(lastbuflen);
+                    handler.Seek(FileIOHandler::SeekOrigin::BEGIN, offset);
+
+                    handler.Read((char *)(&lastbuflen), sizeof(lastbuflen));
+                    remind -= sizeof(lastbuflen);
+
+                    if (remind < lastbuflen)
+                        break;
+
+                    Buffer buf;
+                    offset -= lastbuflen;
+                    handler.Seek(FileIOHandler::SeekOrigin::BEGIN, offset);
+
+                    handler.Read(buf, lastbuflen);
+                    remind -= lastbuflen;
+
+                    MsgRecord msgrecord = MsgSerializeHelper::DeserializeMsg(buf);
+
+                    if (msgrecord.time < expiredTime)
+                    {
+                        needclean = true;
+                        break;
+                    }
+
+                    int beginbuflen = 0;
+                    if (remind < sizeof(beginbuflen))
+                        break;
+
+                    offset -= sizeof(beginbuflen);
+                    handler.Seek(FileIOHandler::SeekOrigin::BEGIN, offset);
+
+                    handler.Read((char *)(&beginbuflen), sizeof(beginbuflen));
+                    remind -= sizeof(beginbuflen);
+
+                    if (beginbuflen == lastbuflen)
+                    {
+                        readMessages.emplace_back(msgrecord);
+                    }
+                }
+                std::reverse(readMessages.begin(), readMessages.end());
+
+                handler.Close();
+
+                if (!needclean)
+                    break;
+
+                // 如果有消息被删除，需要重写文件
+                if (readMessages.size() > 0)
+                {
+                    // 创建新文件
+                    FileIOHandler newHandler;
+                    if (newHandler.Open(filepath + ".tmp", FileIOHandler::OpenMode::WRITE_ONLY))
+                    {
+                        int writecount = 0, buflencount = 0;
+                        // 写入未过期的消息
+                        for (const auto &msg : readMessages)
+                        {
+                            Buffer buf = MsgSerializeHelper::SerializeMsg(msg);
+                            int buflen = buf.Length();
+
+                            writecount += newHandler.Write((char *)(&buflen), sizeof(buflen));
+                            writecount += newHandler.Write(buf);
+                            writecount += newHandler.Write((char *)(&buflen), sizeof(buflen));
+
+                            buflencount += (sizeof(buflen) + buflen + sizeof(buflen));
+                        }
+                        newHandler.Close();
+
+                        if (writecount == buflencount)
+                        {
+                            FileIOHandler::Remove(filepath);
+                            FileIOHandler::RenameFile(filepath + ".tmp", filepath); // 用新文件替换旧文件
+                        }
+                        else
+                        {
+                            FileIOHandler::Remove(filepath + ".tmp");
+                        }
+                    }
+                }
+                else
+                {
+                    FileIOHandler::Remove(filepath); // 所有消息都已过期，删除文件
+                }
+            }
+        }
+    }
+    catch (const std::exception &e)
+    {
+        // 可以在这里添加日志记录
+        std::cerr << "CleanExpiredMsg error: " << e.what() << std::endl;
+    }
 }
