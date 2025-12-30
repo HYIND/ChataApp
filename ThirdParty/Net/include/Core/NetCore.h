@@ -11,7 +11,6 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include "fmt/core.h"
-
 #include <string.h>
 #include <signal.h>
 #include <thread>
@@ -52,5 +51,5 @@
 
 EXPORT_FUNC void InitNetCore();
 EXPORT_FUNC void RunNetCoreLoop(bool isBlock = false);
-EXPORT_FUNC bool NetCoreRunning();
 EXPORT_FUNC void StopNetCoreLoop();
+EXPORT_FUNC bool NetCoreRunning();

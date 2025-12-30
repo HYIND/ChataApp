@@ -10,7 +10,7 @@ include_directories(../ThirdParty/Net/include)
 include_directories(../ThirdParty/publicShare)
 include_directories(../ThirdParty/jwt-cpp)
 include_directories(../source/include)
-include_directories(${OPENSSL_INCLUDE_DIR})
+# include_directories(${OPENSSL_INCLUDE_DIR})
 
 aux_source_directory(../source/src DIR_SRC)
 

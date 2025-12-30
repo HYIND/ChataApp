@@ -1,10 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <string.h>
-#include <algorithm>
 #include <iostream>
-
-
 
 #ifdef _WIN32
 #define EXPORT_FUNC __declspec(dllexport)
