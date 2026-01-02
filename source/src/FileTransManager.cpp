@@ -2,12 +2,23 @@
 #include "FileRecordStore.h"
 #include "LoginUserManager.h"
 #include "NetWorkHelper.h"
+#include "Timer.h"
+
+constexpr int64_t taskexpiredseconds = 30;
+
+int64_t GetTimestampSeconds()
+{
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+}
 
 FileTransTaskContent::FileTransTaskContent(const string &id, FileTransferTask *t, BaseNetWorkSession *s)
 {
     fileid = id;
     task = t;
     session = s;
+    timestamp = GetTimestampSeconds();
 }
 
 FileTransTaskContent::~FileTransTaskContent()
@@ -17,7 +28,22 @@ FileTransTaskContent::~FileTransTaskContent()
 }
 
 FileTransManager::FileTransManager()
+    : HandleLoginUser(nullptr)
 {
+    CleanExpiredTask = TimerTask::CreateRepeat("FileTransManager::CleanExpiredFileTransTimer",
+                                               30 * 1000,
+                                               std::bind(&FileTransManager::CleanExpireTask, this),
+                                               30 * 1000);
+    CleanExpiredTask->Run();
+}
+
+FileTransManager::~FileTransManager()
+{
+    if (CleanExpiredTask)
+    {
+        CleanExpiredTask->Clean();
+        CleanExpiredTask = nullptr;
+    }
 }
 
 FileTransManager *FileTransManager::Instance()
@@ -48,6 +74,8 @@ bool FileTransManager::DistributeMsg(BaseNetWorkSession *session, const json &js
         return false;
 
     string taskid = js["taskid"];
+    UpdateTimeStamp(taskid);
+
     FileTransTaskContent *content = nullptr;
     if (!m_tasks.Find(taskid, content))
         return false;
@@ -167,11 +195,52 @@ bool FileTransManager::AddDownloadTask(const string &fileid, const string &taski
 void FileTransManager::DeleteTask(const string &taskid)
 {
     FileTransTaskContent *content = nullptr;
+    auto guard = m_tasks.MakeLockGuard();
     if (!m_tasks.Find(taskid, content))
         return;
 
     m_tasks.Erase(taskid);
     SAFE_DELETE(content);
+}
+
+void FileTransManager::CleanExpireTask()
+{
+    int64_t currentTime = GetTimestampSeconds();
+    int64_t expiredTime = currentTime - taskexpiredseconds;
+
+    {
+        auto guard = m_tasks.MakeLockGuard();
+        std::map<std::string, FileTransTaskContent *> interruptTasks;
+        m_tasks.EnsureCall([&](std::map<std::string, FileTransTaskContent *> &map) -> void
+                           {
+                        for(auto pair:map){
+                            FileTransTaskContent * content = pair.second;
+                            if(!content||!content->task)
+                            {
+                                interruptTasks[pair.first]= pair.second;
+                                continue;
+                            }
+                            if(content->timestamp<expiredTime)
+                            {
+                                interruptTasks[pair.first]= pair.second;
+                            }
+                        } 
+                        for(auto &pair:interruptTasks)
+                        {
+                            FileTransTaskContent * content = pair.second;
+                            content->task->InterruptTrans(content->session);
+                        } });
+    }
+}
+
+void FileTransManager::UpdateTimeStamp(const string &taskid)
+{
+    FileTransTaskContent *content = nullptr;
+    auto guard = m_tasks.MakeLockGuard();
+    if (!m_tasks.Find(taskid, content))
+        return;
+    if (content)
+        content->timestamp = GetTimestampSeconds();
 }
 
 void FileTransManager::OnUploadFinish(FileTransferUploadTask *task)

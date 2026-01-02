@@ -12,6 +12,7 @@ struct FileTransTaskContent
     string fileid;
     FileTransferTask *task = nullptr;
     BaseNetWorkSession *session = nullptr;
+    int64_t timestamp;
 
     FileTransTaskContent(const string &id, FileTransferTask *t, BaseNetWorkSession *s);
     ~FileTransTaskContent();
@@ -26,6 +27,8 @@ public:
     // 处理消息的入口
     bool ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf);
     bool DistributeMsg(BaseNetWorkSession *session, const json &js, Buffer &buf);
+
+    ~FileTransManager();
 
 protected:
     void AckTaskReq(BaseNetWorkSession *session, const json &js);
@@ -48,10 +51,13 @@ private:
     bool AddUploadTask(const string &fileid, const string &taskid, const string &filepath, BaseNetWorkSession *session);
     bool AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, uint64_t filesize, BaseNetWorkSession *session);
     void DeleteTask(const string &taskid);
+    void CleanExpireTask();
+    void UpdateTimeStamp(const string &taskid);
 
 private:
     SafeMap<string, FileTransTaskContent *> m_tasks; // taskid->content
-    LoginUserManager *HandleLoginUser = nullptr;
+    LoginUserManager *HandleLoginUser;
+    std::shared_ptr<TimerTask> CleanExpiredTask;
 };
 
 #define FILETRANSMANAGER FileTransManager::Instance()
