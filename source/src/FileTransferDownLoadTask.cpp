@@ -465,7 +465,7 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
     //     return;
     // }
 
-    if (buf.Remaind() < chunksize)
+    if (buf.Remain() < chunksize)
     {
         error = true;
         OccurError(session);

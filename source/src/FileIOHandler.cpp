@@ -105,11 +105,11 @@ long FileIOHandler::Read(char *buf, size_t bytesToRead)
 long FileIOHandler::Read(Buffer &buffer, size_t bytesToRead)
 {
     // 确保Buffer有足够空间
-    if (buffer.Remaind() < static_cast<int>(bytesToRead))
+    if (buffer.Remain() < static_cast<int>(bytesToRead))
     {
-        buffer.ReSize(buffer.Postion() + bytesToRead);
+        buffer.ReSize(buffer.Position() + bytesToRead);
     }
-    int result = Read(buffer.Byte() + buffer.Postion(), bytesToRead);
+    int result = Read(buffer.Byte() + buffer.Position(), bytesToRead);
     return result;
 }
 

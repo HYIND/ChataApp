@@ -42,7 +42,7 @@ void MessagePackage::SetBuffer(Buffer &buf)
 
 bool AnalysisMessagePackageFromBuffer(Buffer *buf, MessagePackage *package)
 {
-    int oripos = buf->Postion();
+    int oripos = buf->Position();
 
     bool result = true;
 
@@ -60,7 +60,7 @@ bool AnalysisMessagePackageFromBuffer(Buffer *buf, MessagePackage *package)
 
     if (result && package->jsonlen > 0)
     {
-        if (buf->Remaind() >= package->jsonlen)
+        if (buf->Remain() >= package->jsonlen)
         {
             package->jsondata.Append(*buf, package->jsonlen);
             std::string str(package->jsondata.Byte(), package->jsonlen);
@@ -83,7 +83,7 @@ bool AnalysisMessagePackageFromBuffer(Buffer *buf, MessagePackage *package)
 
     if (result && package->bufferlen > 0)
     {
-        if (buf->Remaind() >= package->bufferlen)
+        if (buf->Remain() >= package->bufferlen)
         {
             package->bufferdata.Append(*buf, package->bufferlen);
         }
