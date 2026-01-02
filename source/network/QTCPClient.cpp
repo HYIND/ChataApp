@@ -73,7 +73,7 @@ bool TCPClient::OnRecvBuffer(Buffer *buffer)
             return false;
     }
 
-    if (buffer->Remaind() > 0)
+    if (buffer->Remain() > 0)
         cacheBuffer.Append(*buffer);
 
     if (_callbackMessage)
@@ -100,12 +100,12 @@ bool TCPClient::Send(Buffer &buffer)
     {
         if (!buffer.Data() || buffer.Length() <= 0)
             return true;
-        while(buffer.Remaind()>0)
+        while(buffer.Remain()>0)
         {
-            qint64 sendcount = BaseCon->write(buffer.Byte()+buffer.Postion(),buffer.Remaind());
+            qint64 sendcount = BaseCon->write(buffer.Byte()+buffer.Position(),buffer.Remain());
             if(sendcount<=0)
                 return false;
-            buffer.Seek(buffer.Postion()+sendcount);
+            buffer.Seek(buffer.Position()+sendcount);
         }
         BaseCon->flush();
         return true;

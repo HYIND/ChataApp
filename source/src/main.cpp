@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     // 进入局部事件循环（非阻塞式等待）
     localLoop.exec();
 
-    CONNECTMANAGER->Login("192.168.58.128",8888);
+    CONNECTMANAGER->Login("192.168.58.130",8888);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 

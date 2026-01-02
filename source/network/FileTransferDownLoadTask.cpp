@@ -454,7 +454,7 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 	//	return;
 	//}
 
-	if (buf.Remaind() < chunksize)
+    if (buf.Remain() < chunksize)
 	{
 		error = true;
 		OccurError();

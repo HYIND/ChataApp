@@ -159,7 +159,7 @@ void MsgManager::ProcessUserMsg(const QJsonObject& jsonObj, Buffer& buf)
 		if (jsonObj.contains("bufferlen"))
 		{
 			qint64 bufferlen = jsonObj.value("bufferlen").toInteger();
-			if (bufferlen > 0 && buf.Remaind() >= bufferlen)
+            if (bufferlen > 0 && buf.Remain() >= bufferlen)
 			{
 				Buffer picbuffer;
 				picbuffer.Append(buf, bufferlen);

@@ -100,11 +100,11 @@ qint64 FileIOHandler::Read(char* buf, qint64 bytesToRead)
 qint64 FileIOHandler::Read(Buffer& buffer, qint64 bytesToRead)
 {
     // 确保Buffer有足够空间
-    if (buffer.Remaind() < static_cast<int>(bytesToRead))
+    if (buffer.Remain() < static_cast<int>(bytesToRead))
     {
-        buffer.ReSize(buffer.Postion() + bytesToRead);
+        buffer.ReSize(buffer.Position() + bytesToRead);
     }
-    int result = Read(buffer.Byte() + buffer.Postion(), bytesToRead);
+    int result = Read(buffer.Byte() + buffer.Position(), bytesToRead);
     return result;
 }
 
