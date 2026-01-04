@@ -22,6 +22,7 @@ protected:
 	void ProcessOnlineUser(const QJsonObject& jsonObj);
 	void ProcessUserMsg(const QJsonObject& jsonObj, Buffer& buf);
 	void ProcessUserMsgRecord(const QJsonObject& jsonObj, Buffer& buf_src);
+    void ProcessSendMsgReceipt(const QJsonObject& jsonObj);
 
 public:
 	bool isPublicChat(const QString& token);

@@ -54,6 +54,7 @@ void MsgManager::ProcessMsg(QByteArray* bytes)
 		ProcessOnlineUser(rootObj);
 		break;
 	case 2002:
+        ProcessSendMsgReceipt(rootObj);
 		break;
 	case 2003:
 		ProcessUserMsg(rootObj, buf_src);
@@ -208,6 +209,17 @@ void MsgManager::ProcessUserMsgRecord(const QJsonObject& jsonObj, Buffer& buf_sr
 			return;
 		}
 	}
+}
+
+void MsgManager::ProcessSendMsgReceipt(const QJsonObject &jsonObj)
+{
+    if (!jsonObj.contains("result") || !jsonObj.value("result").isBool())
+        return;
+    bool result = jsonObj.value("result").toBool();
+    if(!result)
+    {
+        CHATITEMMODEL->sendMsgError();
+    }
 }
 
 bool MsgManager::isPublicChat(const QString& token)

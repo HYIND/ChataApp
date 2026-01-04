@@ -202,6 +202,11 @@ void ChatItemListModel::addNewMsg(const QString& goaltoken,const ChatMsg& chatms
     }
 }
 
+void ChatItemListModel::sendMsgError()
+{
+    emit msgError();
+}
+
 void ChatItemListModel::fileTransProgressChange(const QString &fileid, uint32_t progress)
 {
     bool find = false;

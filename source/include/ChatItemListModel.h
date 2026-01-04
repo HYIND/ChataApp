@@ -145,6 +145,7 @@ public:
     void addChatItem(const QList<ChatItemData> &item);
     void deleteChatItem(const QString& token);
     void addNewMsg(const QString& goaltoken,const ChatMsg& chatmsg);
+    void sendMsgError();
 
     void fileTransProgressChange(const QString& fileid,uint32_t progress);
     void fileTransInterrupted(const QString& fileid);
@@ -172,6 +173,7 @@ private:
 signals:
     void setCurrentIndex(int index);
     void signal_deleteChatItem(const QString& token);
+    void msgError();
 
 public slots:
     void slot_deleteChatItem(const QString& token);
