@@ -64,7 +64,7 @@ bool MsgManager::ProcessMsg(BaseNetWorkSession *session, Buffer *buf)
     return success;
 }
 
-bool MsgManager::ProcessChatMsg(BaseNetWorkSession *session, const string& token, json &js_src, Buffer &buf)
+bool MsgManager::ProcessChatMsg(BaseNetWorkSession *session, const string &token, json &js_src, Buffer &buf)
 {
     if (!js_src.contains("goaltoken"))
     {
@@ -84,7 +84,7 @@ bool MsgManager::ProcessChatMsg(BaseNetWorkSession *session, const string& token
         return ForwardChatMsg(srctoken, goaltoken, js_src, buf);
 }
 
-bool MsgManager::BroadCastPublicChatMsg(const string& token, json &js_src, Buffer &buf)
+bool MsgManager::BroadCastPublicChatMsg(const string &token, json &js_src, Buffer &buf)
 {
     if (!js_src.contains("msg"))
         return false;
@@ -168,14 +168,22 @@ bool MsgManager::BroadCastPublicChatMsg(const string& token, json &js_src, Buffe
     return true;
 }
 
-bool MsgManager::ForwardChatMsg(const string& srctoken, const string& goaltoken, json &js_src, Buffer &buf_src)
+bool MsgManager::ForwardChatMsg(const string &srctoken, const string &goaltoken, json &js_src, Buffer &buf_src)
 {
     if (!js_src.contains("msg"))
         return false;
 
     User *sender = nullptr;
     User *recver = nullptr;
-    if (!HandleLoginUser->FindByToken(srctoken, sender) || !HandleLoginUser->FindByToken(goaltoken, recver))
+    bool result = HandleLoginUser->FindByToken(srctoken, sender) && HandleLoginUser->FindByToken(goaltoken, recver);
+    if (sender)
+    {
+        json js;
+        js["command"] = 2002;
+        js["result"] = result;
+        NetWorkHelper::SendMessagePackage(sender->session, &js);
+    }
+    if (!result)
         return false;
 
     MsgType type = (MsgType)(js_src["type"]);
@@ -239,7 +247,7 @@ bool MsgManager::ForwardChatMsg(const string& srctoken, const string& goaltoken,
     return true;
 }
 
-bool MsgManager::SendOnlineUserMsg(BaseNetWorkSession *session, const string& token)
+bool MsgManager::SendOnlineUserMsg(BaseNetWorkSession *session, const string &token)
 {
     auto &Users = HandleLoginUser->GetOnlineUsers();
 
@@ -269,7 +277,7 @@ bool MsgManager::SendOnlineUserMsg(BaseNetWorkSession *session, const string& to
     return NetWorkHelper::SendMessagePackage(session, &js);
 }
 
-bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, const string& token, json &js_src, Buffer &buf_src)
+bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, const string &token, json &js_src, Buffer &buf_src)
 {
     if (!js_src.contains("goaltoken"))
         return false;
