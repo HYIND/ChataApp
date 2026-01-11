@@ -61,7 +61,7 @@ void ConnectManager::OnPeerClose(BaseNetWorkSession *s)
     emit signal_PeerClose();
 }
 
-void ConnectManager::OnRecvMessage(BaseNetWorkSession *s, Buffer *recv, Buffer *response)
+void ConnectManager::OnRecvMessage(BaseNetWorkSession *s, Buffer *recv)
 {
     QByteArray buffer(recv->Byte(),recv->Length());
     emit signal_RecvMessage(buffer);
@@ -81,7 +81,7 @@ void ConnectManager::slots_Login(const QString &IP, quint16 port)
     }
 
     session->BindSessionCloseCallBack(std::bind(&ConnectManager::OnPeerClose,this,std::placeholders::_1));
-    session->BindRecvDataCallBack(std::bind(&ConnectManager::OnRecvMessage,this,std::placeholders::_1,std::placeholders::_2,std::placeholders::_3));
+    session->BindRecvDataCallBack(std::bind(&ConnectManager::OnRecvMessage,this,std::placeholders::_1,std::placeholders::_2));
 
     status = ConnectStatus::connected;
 }

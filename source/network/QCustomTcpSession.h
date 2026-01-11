@@ -10,6 +10,7 @@ struct CustomPackage
     int seq = 0;
     int ack = -1;
     Buffer buffer;
+    uint8_t msgType = 0; // 0:null, 1:请求, 2:响应
 };
 
 // 基于TCP应用层客户端的自定义通讯协议会话封装
@@ -37,6 +38,8 @@ public:
     bool AwaitSend(const Buffer &buffer, Buffer &response); // 等待返回结果的发送，关心返回的结果
     TCPClient *GetBaseClient();
 
+    void BindRecvRequestCallBack(std::function<void(BaseNetWorkSession *, Buffer *recv, Buffer *resp)> callback);
+
 public:
     virtual bool TryHandshake(uint32_t timeOutMs);
     virtual CheckHandshakeStatus CheckHandshakeTryMsg(Buffer &buffer);
@@ -48,6 +51,8 @@ protected:
     virtual void OnBindRecvDataCallBack();
     virtual void OnBindSessionCloseCallBack();
 
+    void OnBindRecvRequestCallBack();
+
 private:
     bool Send(const Buffer &buffer, int ack = -1); // 异步发送，不关心返回结果
     void ProcessPakage(CustomPackage *newPak = nullptr);
@@ -57,6 +62,8 @@ private:
     std::atomic<int> seq;
     SafeQueue<CustomPackage *> _RecvPaks;
     SafeQueue<CustomPackage *> _SendPaks;
+
+    std::function<void(BaseNetWorkSession *, Buffer *recv, Buffer *response)> _callbackRecvRequest;
     SafeMap<int, AwaitTask *> _AwaitMap; // seq->AwaitTask
 
     Buffer cacheBuffer;

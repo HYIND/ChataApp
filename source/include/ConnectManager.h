@@ -27,7 +27,7 @@ public:
 
 public:
     void OnPeerClose(BaseNetWorkSession* s);
-    void OnRecvMessage(BaseNetWorkSession* s,Buffer* recv,Buffer* response);
+    void OnRecvMessage(BaseNetWorkSession* s,Buffer* recv);
 
     CustomTcpSession* Session()const;
 signals:

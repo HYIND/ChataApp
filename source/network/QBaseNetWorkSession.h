@@ -18,7 +18,7 @@ public: // 供Listener/EndPoint调用,须继承实现
     virtual CheckHandshakeStatus CheckHandshakeConfirmMsg(Buffer &buffer) = 0;
 
 public: // 供外部调用
-    void BindRecvDataCallBack(std::function<void(BaseNetWorkSession *, Buffer *recv, Buffer *response)> callback);
+    void BindRecvDataCallBack(std::function<void(BaseNetWorkSession *, Buffer *recv)> callback);
     void BindSessionCloseCallBack(std::function<void(BaseNetWorkSession *)> callback);
     QString GetIPAddr();
     quint16 GetPort();
@@ -39,6 +39,6 @@ protected:
 
     bool isHandshakeComplete;
 
-    std::function<void(BaseNetWorkSession *, Buffer *recv, Buffer *response)> _callbackRecvData;
+    std::function<void(BaseNetWorkSession *, Buffer *recv)> _callbackRecvData;
     std::function<void(BaseNetWorkSession *)> _callbackSessionClose;
 };

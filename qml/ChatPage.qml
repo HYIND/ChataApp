@@ -278,4 +278,10 @@ Item {
             }
         }
     }
+    Connections {
+        target: chatitemlistmodel
+        function onmsgError(index) {
+            tipPopup.show("对方不在线哦！")
+        }
+    }
 }
