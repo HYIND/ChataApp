@@ -2,7 +2,7 @@
 
 void ConnectManager::callBackSessionEstablish(BaseNetWorkSession *session)
 {
-    session->BindRecvDataCallBack(std::bind(&ConnectManager::callBackRecvMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    session->BindRecvDataCallBack(std::bind(&ConnectManager::callBackRecvMessage, this, std::placeholders::_1, std::placeholders::_2));
     session->BindSessionCloseCallBack(std::bind(&ConnectManager::callBackCloseConnect, this, std::placeholders::_1));
     sessions.emplace(session);
 
@@ -17,7 +17,7 @@ void ConnectManager::callBackSessionEstablish(BaseNetWorkSession *session)
     }
 }
 
-void ConnectManager::callBackRecvMessage(BaseNetWorkSession *basesession, Buffer *recv, Buffer *response)
+void ConnectManager::callBackRecvMessage(BaseNetWorkSession *basesession, Buffer *recv)
 {
     CustomTcpSession *session = (CustomTcpSession *)basesession;
 

@@ -10,7 +10,7 @@ public:
     // 建立连接
     void callBackSessionEstablish(BaseNetWorkSession *session);
     // 收取消息
-    void callBackRecvMessage(BaseNetWorkSession *basesession, Buffer *recv, Buffer *response);
+    void callBackRecvMessage(BaseNetWorkSession *basesession, Buffer *recv);
     // 连接关闭
     void callBackCloseConnect(BaseNetWorkSession *session);
 
