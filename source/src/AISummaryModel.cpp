@@ -101,7 +101,7 @@ void AISummaryModel::Need()
     {
         if(LlamaModel::Instance()->isLoaded())
         {
-            m_llclient = LlamaModel::Instance()->CreateNewClient();
+            m_llclient = LlamaModel::Instance()->CreateNewClient(ProcessPriority::Last);
             m_llclient->bindOutPutTextCallback(std::bind(&AISummaryModel::recvOutPutText,this,std::placeholders::_1,std::placeholders::_2));
         }
     }
@@ -112,7 +112,7 @@ QString AISummaryModel::GetInputTextFromChatMsgs(QList<ChatMsg> &chatmsgs)
     QString result;
 
     // 添加总结提示词
-    result.append("以下是聊天记录，请帮我总结主要内容：\n\n");
+    result.append(QString("以下是聊天记录，请帮我总结主要内容，其中我的用户名是[%1]""：\n\n").arg(USERINFOMODEL->username()));
 
     int textCount = 0;
     int mediaCount = 0;

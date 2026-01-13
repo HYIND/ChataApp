@@ -5,7 +5,6 @@
 LlamaClient::LlamaClient(const std::string &sessionid)
 {
     m_sessionid = sessionid;
-    outputtextcallback =nullptr;
 }
 
 LlamaClient::~LlamaClient()
@@ -49,6 +48,5 @@ void LlamaClient::clearHistory()
 
 void LlamaClient::bindOutPutTextCallback(std::function<void (QString, int)> callback)
 {
-    outputtextcallback = callback;
-    LlamaModel::Instance()->bindOutPutTextCallback(m_sessionid, outputtextcallback);
+    LlamaModel::Instance()->bindOutPutTextCallback(m_sessionid, callback);
 }

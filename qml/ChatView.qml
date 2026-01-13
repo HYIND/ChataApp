@@ -127,7 +127,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.right: parent.right
                     anchors.rightMargin: 20
-                    width: 70
+                    width: 80
                     height: 30
 
                     background: Rectangle {
@@ -175,13 +175,14 @@ Item {
                             }
                             else if (state == 1)
                             {
-                                summaryButton.contentItem.text = "处理完成"
-                                summaryButton.ToolTip.text = aisummaryModel.getSummaryText(sessionModel.sessionToken);
+                                summaryButton.contentItem.text = "悬停查看"
+                                summaryButton.ToolTip.text =
+                                        aisummaryModel.getSummaryText(sessionModel.sessionToken) + "\n\n点击按钮重新生成总结";
                             }
                             else if (state == 2)
                             {
                                 summaryButton.contentItem.text = "处理失败"
-                                summaryButton.ToolTip.text = "AI总结失败！"
+                                summaryButton.ToolTip.text = "AI总结失败！" + "\n\n点击按钮重新生成总结"
                             }
                         }
                     }
@@ -190,8 +191,8 @@ Item {
                         function onsummaryDone(sessiontoken,summarydata) {
                             if(sessiontoken == sessionModel.sessionToken)
                             {
-                                summaryButton.contentItem.text = "查看总结"
-                                summaryButton.ToolTip.text = summarydata;
+                                summaryButton.contentItem.text = "悬停查看"
+                                summaryButton.ToolTip.text = summarydata + "\n\n点击按钮重新生成总结";
                             }
                         }
                     }

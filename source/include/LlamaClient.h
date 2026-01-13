@@ -23,7 +23,6 @@ public:
 
     void bindOutPutTextCallback(std::function<void(QString,int)> callback);
 private:
-    std::function<void(QString,int)> outputtextcallback;
     std::string m_sessionid;
 };
 

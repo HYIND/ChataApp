@@ -43,7 +43,16 @@ enum class TaskState
     Normal = 0,
     ManualPause = 1,         //手动暂停
     MaxGenTokenPause = 2,    //单次生成token限制暂停
-    MaxGenCountPause = 3,   //单任务循环多次生成次数限制暂停
+    MaxGenCountPause = 3,    //单任务循环多次生成次数限制暂停
+    TokenClipPause = 4       //Token生成时间片让出暂停
+};
+
+enum class ProcessPriority
+{
+    First,
+    Second,
+    Third,
+    Last
 };
 
 struct ClientHandle;
@@ -93,6 +102,8 @@ struct ClientHandle
 
     std::function<void(QString,int)> outputtextcallback;
 
+    int tokenclipsize = 10;
+
     void ClearPausedTask();
 };
 
@@ -108,7 +119,7 @@ public:
 
     void runasyncprocess();
 
-    LlamaClient* CreateNewClient();
+    LlamaClient* CreateNewClient(ProcessPriority priority = ProcessPriority::Second);
     void CloseClient(std::string sessionid);
 
     ~LlamaModel();

@@ -483,7 +483,6 @@ bool LlamaModel::processTask(AITask &task)
 
                 if(task.handle->outputtextcallback)
                     task.handle->outputtextcallback(outputdelta,1);
-                // emit outputText(outputdelta, 1);
 
                 task.laststate = task.state;
                 task.state = GenerateState::thinking;
@@ -499,7 +498,6 @@ bool LlamaModel::processTask(AITask &task)
 
                 if(task.handle->outputtextcallback)
                     task.handle->outputtextcallback(outputdelta,1);
-                // emit outputText(outputdelta, 1);
 
                 task.laststate = task.state;
                 task.state = GenerateState::talking;
@@ -525,7 +523,6 @@ bool LlamaModel::processTask(AITask &task)
 
                 if(task.handle->outputtextcallback)
                     task.handle->outputtextcallback(outputdelta,1);
-                // emit outputText(outputdelta, 1);
 
                 task.laststate = task.state;
                 task.state = GenerateState::toolusing;
@@ -544,7 +541,6 @@ bool LlamaModel::processTask(AITask &task)
 
                 if(task.handle->outputtextcallback)
                     task.handle->outputtextcallback(outputdelta,1);
-                // emit outputText(outputdelta, 1);
 
                 lastoutputpos += oristrlen;
                 continue;
@@ -562,7 +558,6 @@ bool LlamaModel::processTask(AITask &task)
 
                     if(task.handle->outputtextcallback)
                         task.handle->outputtextcallback(outputdelta,1);
-                    // emit outputText(outputdelta, 1);
 
                     task.firstoutputthinkingtext = false;
                     lastoutputpos += oristrlen;
@@ -580,7 +575,6 @@ bool LlamaModel::processTask(AITask &task)
 
                     if(task.handle->outputtextcallback)
                         task.handle->outputtextcallback(outputdelta,1);
-                    // emit outputText(outputdelta, 1);
 
                     task.firstoutputtalkingtext = false;
                     lastoutputpos += oristrlen;
@@ -598,7 +592,6 @@ bool LlamaModel::processTask(AITask &task)
 
                     if(task.handle->outputtextcallback)
                         task.handle->outputtextcallback(outputdelta,1);
-                    // emit outputText(outputdelta, 1);
 
                     task.firstoutputtalkingtext = false;
                     lastoutputpos += oristrlen;
@@ -655,7 +648,6 @@ bool LlamaModel::processTask(AITask &task)
                     // qDebug()<<outputtext;
                     if(task.handle->outputtextcallback)
                         task.handle->outputtextcallback(outputtext,0);
-                    // emit outputText(outputtext, 0);
 
                     return true;
                 }
@@ -674,9 +666,11 @@ bool LlamaModel::processTask(AITask &task)
                 task.generatecount++;
                 task.handle->m_inputtask.enqueue(task);
 
-                if(task.handle->outputtextcallback)
-                    task.handle->outputtextcallback("",2);
-                // emit outputText("", 2);
+                if(task.taskstate!= TaskState::TokenClipPause)
+                {
+                    if(task.handle->outputtextcallback)
+                        task.handle->outputtextcallback("",2);
+                }
             }
             return true;
         }
@@ -690,14 +684,12 @@ bool LlamaModel::processTask(AITask &task)
 
         if(task.handle->outputtextcallback)
             task.handle->outputtextcallback("",2);
-        // emit outputText("", 2);
 
         return true;
     }
 
     if(task.handle->outputtextcallback)
         task.handle->outputtextcallback("",0);
-    // emit outputText("", 0);
 
     return false;
 }
@@ -728,7 +720,7 @@ int LlamaModel::GetBatchToProcess(ClientHandle& handle, llama_batch& batch, int 
 
     if (batch.token == nullptr) {
         qDebug() << "Failed to initialize batch";
-        return false;
+        return -1;
     }
 
     for (int index = handle.m_todecodepos; index < newpos; index++) {
@@ -749,7 +741,7 @@ bool LlamaModel::preprocess(AITask& task)
     if(task.handle->m_curtokens.size() == 0)
     {
         // m_curtokens为空，直接重建prompt
-        if(task.taskstate == TaskState::ManualPause || task.taskstate == TaskState::MaxGenTokenPause)
+        if(task.taskstate == TaskState::ManualPause || task.taskstate == TaskState::MaxGenTokenPause || task.taskstate == TaskState::TokenClipPause)
         {
             std::string prompt = buildQwenPrompt(task.handle->m_chathistory,false,task.needthinking);
             prompt += "<|im_start|>assistant\n";
@@ -897,7 +889,7 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
         task.firstoutputthinkingtext = true;
         task.firstoutputtalkingtext = true;
     }
-    else /*if(task.taskstate == TaskState::ManualPause || task.taskstate == TaskState::MaxGenTokenPause)*/
+    else
     {
         if(task.handle->m_curtokens.size()==0)
         {
@@ -907,7 +899,8 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
                 return false;
             }
         }
-        task.current_gen = 0;
+        if(task.taskstate == TaskState::ManualPause || task.taskstate == TaskState::MaxGenTokenPause)
+            task.current_gen = 0;
     }
 
     if(task.taskstate != TaskState::Normal)
@@ -930,6 +923,9 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
     }
     int btachlen = llama_n_batch(m_ctx);
 
+    int last_check_loop_decode_count = 0;
+    int loop_decode_count = 0;
+
     for (; task.current_gen < max_gen; task.current_gen++)
     {
         if(task.handle->shouldpause)
@@ -937,6 +933,33 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
             result = false;
             task.taskstate = TaskState::ManualPause;
             break;
+        }
+
+        if(loop_decode_count > 0 && loop_decode_count - last_check_loop_decode_count >= task.handle->tokenclipsize)
+        {
+            last_check_loop_decode_count = loop_decode_count;
+
+            bool needpause = false;
+            for(auto it:m_handles)
+            {
+                auto handle = it.second;
+                if(handle == task.handle)
+                    continue;
+
+                //检查到有其他任务在等待，基于时间片原则让出
+                if(!handle->m_inputtask.empty() && !handle->shouldpause)
+                {
+                    needpause = true;
+                    break;
+                }
+            }
+
+            if(needpause)
+            {
+                result = false;
+                task.taskstate = TaskState::TokenClipPause;
+                break;
+            }
         }
 
         btachlen = GetBatchToProcess(*(task.handle),batch,btachlen);
@@ -954,7 +977,8 @@ bool LlamaModel::generate(AITask& task, std::function<void()> outputchangecallba
             break;
         }
 
-       task.handle->m_todecodepos += batch.n_tokens;
+        task.handle->m_todecodepos += batch.n_tokens;
+        loop_decode_count += batch.n_tokens;
 
         if(batch.logits[batch.n_tokens - 1] == 1)
         {
@@ -1035,7 +1059,7 @@ void LlamaModel::runasyncprocess()
     }
 }
 
-LlamaClient *LlamaModel::CreateNewClient()
+LlamaClient *LlamaModel::CreateNewClient(ProcessPriority priority)
 {
     static int seqid = 0;
     const std::string &sessionid = generate_random_string_16();
@@ -1045,6 +1069,15 @@ LlamaClient *LlamaModel::CreateNewClient()
     handle->m_sampler = getsampler();
     handle->seqid = seqid;
     handle->m_vocab = m_vocab;
+
+    if(priority == ProcessPriority::First)
+        handle->tokenclipsize = 50;
+    else if(priority == ProcessPriority::Second)
+        handle->tokenclipsize = 35;
+    else if(priority == ProcessPriority::Third)
+        handle->tokenclipsize = 20;
+    else if(priority == ProcessPriority::Last)
+        handle->tokenclipsize = 10;
 
     seqid++;
 
