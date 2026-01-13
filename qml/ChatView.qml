@@ -123,6 +123,7 @@ Item {
                 // AI总结按钮
                 Button {
                     id: summaryButton
+                    visible: aisummaryModel.isLoaded()
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.right: parent.right
                     anchors.rightMargin: 20
