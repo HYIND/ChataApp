@@ -31,27 +31,37 @@ void CriticalSectionLock::Leave()
 
 #elif defined(_WIN32)
 
-CriticalSectionLock::CriticalSectionLock() {
+CriticalSectionLock::CriticalSectionLock()
+{
     InitializeCriticalSection(&_cs);
 }
 
-CriticalSectionLock::~CriticalSectionLock() {
+CriticalSectionLock::~CriticalSectionLock()
+{
     DeleteCriticalSection(&_cs);
 }
 
-bool CriticalSectionLock::TryEnter() {
+bool CriticalSectionLock::TryEnter()
+{
     return TryEnterCriticalSection(&_cs) != 0;
 }
 
-void CriticalSectionLock::Enter() {
+void CriticalSectionLock::Enter()
+{
     EnterCriticalSection(&_cs);
 }
 
-void CriticalSectionLock::Leave() {
+void CriticalSectionLock::Leave()
+{
     LeaveCriticalSection(&_cs);
 }
 
 #endif
+
+bool CriticalSectionLock::try_lock()
+{
+    return TryEnter();
+}
 
 void CriticalSectionLock::lock()
 {
@@ -61,4 +71,49 @@ void CriticalSectionLock::lock()
 void CriticalSectionLock::unlock()
 {
     Leave();
+}
+
+LockGuard::LockGuard(CriticalSectionLock &lock, bool istrylock)
+    : _lock(lock), _isownlock(false)
+{
+    if (!istrylock)
+    {
+        _lock.Enter();
+        _isownlock = true;
+    }
+    else
+    {
+        _isownlock = _lock.TryEnter();
+    }
+}
+
+bool LockGuard::isownlock()
+{
+    return _isownlock;
+}
+
+LockGuard::~LockGuard()
+{
+    if (_isownlock)
+        _lock.Leave();
+}
+
+void ConditionVariable::Wait(CriticalSectionLock &lock)
+{
+    _cv.wait(lock);
+}
+
+bool ConditionVariable::WaitFor(CriticalSectionLock &lock, const std::chrono::microseconds ms)
+{
+    return _cv.wait_for(lock, ms) == std::cv_status::timeout;
+}
+
+void ConditionVariable::NotifyAll()
+{
+    _cv.notify_all();
+}
+
+void ConditionVariable::NotifyOne()
+{
+    _cv.notify_one();
 }

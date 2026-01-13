@@ -24,6 +24,9 @@ set(APP_SOURCES
     source/src/3DModelViewerModel.cpp
     source/src/LlamaModel.cpp
     source/src/LlamaToolHelper.cpp
+    source/src/LlamaClient.cpp
+    source/src/AIAssistantModel.cpp
+    source/src/AISummaryModel.cpp
 
 
     source/network/QCustomTcpSession.cpp
@@ -53,6 +56,9 @@ set(APP_INCLUDES
     source/include/3DModelViewerModel.h
     source/include/LlamaModel.h
     source/include/LlamaToolHelper.h
+    source/include/LlamaClient.h
+    source/include/AIAssistantModel.h
+    source/include/AISummaryModel.h
 
 
     source/network/QCustomTcpSession.h

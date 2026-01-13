@@ -6,7 +6,8 @@
 #include "ChatSessionModel.h"
 #include "UserInfoModel.h"
 #include "LoginModel.h"
-#include "LlamaModel.h"
+#include "AIAssistantModel.h"
+#include "AISummaryModel.h"
 
 class ModelManager:public QObject
 {
@@ -19,7 +20,8 @@ public:
     ChatSessionModel* chatsessionmodel() const { return m_chatsessionmodel; }
     UserInfoModel* userinfomodel() const { return m_userinfomodel; }
     LoginModel* loginmodel() const { return m_loginmodel; }
-    LlamaModel* llamamodel() const {return m_llamamodel;}
+    AIAssistantModel* aiassistantModel() const {return m_aiassistantmodel;}
+    AISummaryModel* aisummaryModel() const{return m_aisummarymodel;}
 
 private:
     explicit ModelManager(QObject* parent = nullptr);
@@ -29,7 +31,8 @@ private:
     ChatSessionModel* m_chatsessionmodel;
     UserInfoModel* m_userinfomodel;
     LoginModel* m_loginmodel;
-    LlamaModel* m_llamamodel;
+    AIAssistantModel* m_aiassistantmodel;
+    AISummaryModel* m_aisummarymodel;
 };
 
 #define MODELMANAGER ModelManager::Instance()
@@ -37,7 +40,8 @@ private:
 #define SESSIONMODEL ModelManager::Instance()->chatsessionmodel()
 #define USERINFOMODEL ModelManager::Instance()->userinfomodel()
 #define LOGINMODEL ModelManager::Instance()->loginmodel()
-#define LLAMAMODEL ModelManager::Instance()->llamamodel()
+#define AIASSISTANTMODEL ModelManager::Instance()->aiassistantModel()
+#define AISUMMARYMODEL ModelManager::Instance()->aisummaryModel()
 
 
 #endif // MODELMANAGER_H

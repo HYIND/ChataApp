@@ -7,6 +7,7 @@ Item {
     anchors.fill: parent
 
     property var sessionModel: null
+    property var aisummaryModel: null
     readonly property bool hasActiveSession: (root.sessionModel
                                               && root.sessionModel.sessionToken) ? true : false
     // 空白状态提示（当sessionToken为空时显示）
@@ -117,6 +118,81 @@ Item {
                         // font.bold: true
                         font.pixelSize: 14
                         text: root.sessionModel.sessionSubtitle
+                    }
+                }
+                // AI总结按钮
+                Button {
+                    id: summaryButton
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: parent.right
+                    anchors.rightMargin: 20
+                    width: 70
+                    height: 30
+
+                    background: Rectangle {
+                        color: "#1abc9c"
+                        radius: 5
+                    }
+
+                    contentItem: Text {
+                        text: "AI总结"
+                        color: "black"
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        anchors.fill: parent
+                    }
+
+                    // 点击事件
+                    onClicked: {
+                        var state = aisummaryModel.getSummaryState(sessionModel.sessionToken);
+                        if(state != 0)
+                        {
+                            summaryButton.contentItem.text = "处理中..."
+                            aisummaryModel.addSummaryTask(sessionModel.sessionToken);
+                            ToolTip.text = "AI总结中...";
+                        }
+                    }
+
+                    ToolTip.visible: hovered
+                    ToolTip.text: "点击查看聊天内容总结"
+                    ToolTip.delay: 300
+
+                    Connections {
+                        target: sessionModel
+                        function onsessionTokenChanged() {
+                            var state = aisummaryModel.getSummaryState(sessionModel.sessionToken);
+                            if(state == -1)
+                            {
+                                summaryButton.contentItem.text = "AI总结"
+                                summaryButton.ToolTip.text = "点击总结聊天内容总结"
+                            }
+                            else if (state == 0)
+                            {
+                                summaryButton.contentItem.text = "处理中..."
+                                summaryButton.ToolTip.text = "AI总结中..."
+                            }
+                            else if (state == 1)
+                            {
+                                summaryButton.contentItem.text = "处理完成"
+                                summaryButton.ToolTip.text = aisummaryModel.getSummaryText(sessionModel.sessionToken);
+                            }
+                            else if (state == 2)
+                            {
+                                summaryButton.contentItem.text = "处理失败"
+                                summaryButton.ToolTip.text = "AI总结失败！"
+                            }
+                        }
+                    }
+                    Connections {
+                        target: aisummaryModel
+                        function onsummaryDone(sessiontoken,summarydata) {
+                            if(sessiontoken == sessionModel.sessionToken)
+                            {
+                                summaryButton.contentItem.text = "查看总结"
+                                summaryButton.ToolTip.text = summarydata;
+                            }
+                        }
                     }
                 }
             }

@@ -15,10 +15,10 @@ int main(int argc, char *argv[])
 
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
-    LLAMAMODEL->load("./chatmodel.gguf");
-    if(LLAMAMODEL->isLoaded())
+    LlamaModel::Instance()->load("./chatmodel.gguf");
+    if(LlamaModel::Instance()->isLoaded())
     {
-        std::thread T(&LlamaModel::runasyncprocess,LLAMAMODEL);
+        std::thread T(&LlamaModel::runasyncprocess,LlamaModel::Instance());
         T.detach();
     }
 
@@ -43,7 +43,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("sessionmodel", SESSIONMODEL);
     engine.rootContext()->setContextProperty("userinfomodel", USERINFOMODEL);
     engine.rootContext()->setContextProperty("loginmodel", LOGINMODEL);
-    engine.rootContext()->setContextProperty("llamamodel", LLAMAMODEL);
+    engine.rootContext()->setContextProperty("aiassistantmodel", AIASSISTANTMODEL);
+    engine.rootContext()->setContextProperty("aisummarymodel", AISUMMARYMODEL);
     engine.load(url);
 
     // 创建局部事件循环和超时控制器等待子线程完成初始化

@@ -698,7 +698,7 @@ Window {
 
     Connections {
         target: model
-        function onoutputText(text,operation) { //0结束 1输出内容 2手动暂停 3
+        function onoutputText(text,operation) { //0结束 1输出内容 2手动暂停
             if(operation == 1)
             {
                 if(state == 3)

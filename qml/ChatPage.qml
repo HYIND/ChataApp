@@ -143,14 +143,14 @@ Item {
                                                 aichatmousearea.onExited()
                                             }
                                         }
-                                        model:llamamodel
+                                        model:aiassistantmodel
                                     }
 
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        if(llamamodel.isLoaded()) {
+                                        if(aiassistantmodel.isLoaded()) {
                                             root.onWindowPosChanged()
                                             aichatwindow.visible = !aichatwindow.visible
                                         }
@@ -274,6 +274,7 @@ Item {
                     width: parent.width
                     height: parent.height
                     sessionModel: sessionmodel
+                    aisummaryModel: aisummarymodel
                 }
             }
         }

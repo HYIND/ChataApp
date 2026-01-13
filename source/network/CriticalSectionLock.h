@@ -2,10 +2,12 @@
 
 #ifdef __linux__
 #include <pthread.h>
+#include <mutex>
 #elif defined(_WIN32)
 #include <windows.h>
 #endif
-#include <mutex>
+#include <condition_variable>
+#include <chrono>
 
 class CriticalSectionLock
 {
@@ -16,8 +18,9 @@ public:
     void Enter();
     void Leave();
 
-    // 适配std::lock_guard
+    // 适配std::lock_guard和condition_variable
 public:
+    bool try_lock();
     void lock();
     void unlock();
 
@@ -28,4 +31,47 @@ private:
 #elif defined(_WIN32)
     CRITICAL_SECTION _cs;
 #endif
+};
+
+class ConditionVariable
+{
+public:
+    ConditionVariable() = default;
+    ~ConditionVariable() = default;
+
+    ConditionVariable(const ConditionVariable &) = delete;
+    ConditionVariable &operator=(const ConditionVariable &) = delete;
+    ConditionVariable(ConditionVariable &&) = delete;
+    ConditionVariable &operator=(ConditionVariable &&) = delete;
+
+    void Wait(CriticalSectionLock &lock);
+    bool WaitFor(CriticalSectionLock &lock, const std::chrono::microseconds ms);
+    template <class BoolFunc>
+    bool WaitFor(CriticalSectionLock &lock, const std::chrono::microseconds ms, BoolFunc func)
+    {
+        return _cv.wait_for(lock, ms, func) == std::cv_status::timeout;
+    }
+
+    void NotifyAll();
+    void NotifyOne();
+
+private:
+    std::condition_variable_any _cv;
+};
+
+class LockGuard
+{
+public:
+    LockGuard(CriticalSectionLock &lock, bool istrylock = false);
+    bool isownlock();
+    ~LockGuard();
+
+    LockGuard(const LockGuard &) = delete;
+    LockGuard &operator=(const LockGuard &) = delete;
+    LockGuard(LockGuard &&) = delete;
+    LockGuard &operator=(LockGuard &&) = delete;
+
+private:
+    CriticalSectionLock &_lock;
+    bool _isownlock;
 };
