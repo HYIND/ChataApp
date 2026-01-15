@@ -12,7 +12,7 @@ public:
 
 public:
     void SendMsg(const QString& goaltoken, const MsgType type, const QString& msg);
-    void SendMsg(const QString& goaltoken, const MsgType type, const QString& content, Buffer& buf);
+    void SendPicture(const QString& goaltoken,const QString& filename, int64_t filesize, const QString& md5, const QString& fileid,Buffer& buf);
     void SendFile(const QString &goaltoken, const QString &filename, int64_t filesize, const QString& md5,const QString& fileid);
     void RequestOnlineUserData();
     void RequestMessageRecord(const QString &goaltoken);

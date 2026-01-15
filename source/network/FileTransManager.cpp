@@ -4,6 +4,7 @@
 #include <QUuid>
 #include <QTimer>
 #include "NetWorkHelper.h"
+#include <QCoreApplication>
 
 const QString default_downloaddir = "chat_download/";
 ;
@@ -259,7 +260,8 @@ void FileTransManager::InterruptTask(const QString& fileid)
 
 QString FileTransManager::DownloadDir()
 {
-	return default_downloaddir;
+    QString appDirPath = QCoreApplication::applicationDirPath();
+    return appDirPath + "/" + default_downloaddir + USERINFOMODEL->usertoken() + "/" ;
 }
 
 QString FileTransManager::FindDownloadPathByFileId(const QString &fileid)

@@ -31,20 +31,25 @@ void RequestManager::SendMsg(const QString& goaltoken, const MsgType type, const
 	NetWorkHelper::SendMessagePackage(&jsonObj);
 }
 
-void RequestManager::SendMsg(const QString& goaltoken, const MsgType type, const QString& content, Buffer& buf)
+void RequestManager::SendPicture(const QString& goaltoken,
+                                const QString& filename, int64_t filesize, const QString& md5, const QString& fileid,
+                                Buffer& buf)
 {
-	if (type != MsgType::picture)
-		return;
-
-	QJsonObject jsonObj;
-	jsonObj.insert("command", 1002);
+    QJsonObject jsonObj;
+    jsonObj.insert("command", 1002);
     jsonObj.insert("jwt", USERINFOMODEL->userjwt());
-	jsonObj.insert("goaltoken", goaltoken);
-	jsonObj.insert("type", (int)type);
-	jsonObj.insert("msg", content);
+    jsonObj.insert("goaltoken", goaltoken);
+    jsonObj.insert("type", (int)MsgType::picture);
+    jsonObj.insert("msg", "");
 
-	NetWorkHelper::SendMessagePackage(&jsonObj, &buf);
+    jsonObj.insert("filename", filename);
+    jsonObj.insert("filesize", (int64_t)filesize);
+    jsonObj.insert("md5", md5);
+    jsonObj.insert("fileid", fileid);
+
+    NetWorkHelper::SendMessagePackage(&jsonObj, &buf);
 }
+
 
 void RequestManager::SendFile(const QString& goaltoken, const QString& filename, int64_t filesize, const QString& md5, const QString& fileid)
 {

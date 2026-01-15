@@ -148,7 +148,7 @@ void MsgManager::ProcessUserMsg(const QJsonObject& jsonObj, Buffer& buf)
 	uint64_t filesize = 0;
 	QString md5;
 	QString fileid;
-	if (type == MsgType::file)
+    if (type == MsgType::file || type == MsgType::picture)
 	{
 		filename = jsonObj.value("filename").toString();
 		filesize = jsonObj.value("filesize").toInteger();

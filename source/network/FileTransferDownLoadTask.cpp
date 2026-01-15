@@ -484,7 +484,7 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 
 		if (!error)
 		{
-            chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_left + truthwritecount);
+            chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_right);
             chunk_map = mergeChunks(chunk_map);
 			// displayTransferProgress(file_size, chunk_map);
         }

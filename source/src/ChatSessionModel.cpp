@@ -5,6 +5,65 @@
 #include <QFile>
 #include "FileTransManager.h"
 #include <QUuid>
+#include <QImage>
+#include <QBuffer>
+
+QString generateThumbnailBase64(const QString& imagePath,
+                                int maxWidth = 320,
+                                int maxHeight = 240,
+                                int quality = 85,
+                                const QString& format = "JPEG") {
+
+    // 1. 加载图片
+    QImage image(imagePath);
+    if (image.isNull()) {
+        qWarning() << "无法加载图片:" << imagePath;
+        return QString();
+    }
+
+    // 2. 计算缩略图尺寸（保持纵横比）
+    QSize originalSize = image.size();
+    QSize thumbnailSize = originalSize;
+
+    if (originalSize.width() > maxWidth || originalSize.height() > maxHeight) {
+        thumbnailSize = originalSize.scaled(maxWidth, maxHeight, Qt::KeepAspectRatio);
+    }
+
+    // 3. 生成缩略图（高质量缩放）
+    QImage thumbnail;
+    if (thumbnailSize != originalSize) {
+        // 使用平滑变换
+        thumbnail = image.scaled(thumbnailSize,
+                                 Qt::IgnoreAspectRatio,
+                                 Qt::SmoothTransformation);
+    } else {
+        thumbnail = image;
+    }
+
+    // 4. 可选：转换为RGB格式节省空间（如果原图是RGBA）
+    if (thumbnail.hasAlphaChannel()) {
+        thumbnail = thumbnail.convertToFormat(QImage::Format_RGB888);
+    }
+
+    // 5. 保存为base64
+    QByteArray imageBytes;
+    QBuffer buffer(&imageBytes);
+    buffer.open(QIODevice::WriteOnly);
+
+    if (thumbnail.save(&buffer, format.toUtf8().constData(), quality)) {
+        QString base64 = QString::fromLatin1(imageBytes.toBase64());
+
+        // 调试信息
+        // qDebug() << "缩略图生成完成:";
+        // qDebug() << "原图尺寸:" << originalSize << "大小:" << QFile(imagePath).size() / 1024 << "KB";
+        // qDebug() << "缩略图尺寸:" << thumbnailSize << "大小:" << imageBytes.size() / 1024 << "KB";
+        // qDebug() << "压缩比例:" << (imageBytes.size() * 100.0 / QFile(imagePath).size()) << "%";
+
+        return base64;
+    }
+
+    return QString();
+}
 
 ChatSessionModel::ChatSessionModel(QObject* parent)
 	: QAbstractListModel(parent)
@@ -140,7 +199,7 @@ void ChatSessionModel::fileTransProgressChange(const QString& fileid, uint32_t p
 {
 	for (int index = 0; index < m_messages.size(); index++)
 	{
-		if (m_messages[index].type != MsgType::file)
+        if (m_messages[index].type != MsgType::file && m_messages[index].type != MsgType::picture)
 			continue;
 		if (m_messages[index].fileid == fileid)
 		{
@@ -157,7 +216,7 @@ void ChatSessionModel::fileTransInterrupted(const QString& fileid)
 {
 	for (int index = 0; index < m_messages.size(); index++)
 	{
-		if (m_messages[index].type != MsgType::file)
+        if (m_messages[index].type != MsgType::file && m_messages[index].type != MsgType::picture)
 			continue;
 		if (m_messages[index].fileid == fileid)
 		{
@@ -173,7 +232,7 @@ void ChatSessionModel::fileTransFinished(const QString& fileid)
 {
 	for (int index = 0; index < m_messages.size(); index++)
 	{
-		if (m_messages[index].type != MsgType::file)
+        if (m_messages[index].type != MsgType::file && m_messages[index].type != MsgType::picture)
 			continue;
 		if (m_messages[index].fileid == fileid)
 		{
@@ -193,7 +252,7 @@ void ChatSessionModel::fileTransError(const QString& fileid)
 	{
 		if (m_messages[index].type != MsgType::file)
 			continue;
-		if (m_messages[index].fileid == fileid)
+        if (m_messages[index].fileid == fileid && m_messages[index].type != MsgType::picture)
 		{
 			m_messages[index].fileprogress = 0;
 			m_messages[index].filestatus = FileStatus::Fail;
@@ -214,15 +273,23 @@ void ChatSessionModel::sendPicture(const QString& goaltoken, const QString& url)
 	QFile file(url);
 	if (!file.open(QIODevice::ReadOnly)) {
 		qWarning() << "sendPicture error ,无法打开文件:" << url;
+        return;
 	}
-	QByteArray fileData = file.readAll();
+
+    QString filepath = url;
+    QString filename = getFilenameFromPath(file.fileName());
+    QString fileid = QUuid::createUuid().toString();
+    QString md5 = "";
+    qint64 filesize = file.size();
+
 	file.close();
 
-	QString base64content = QString::fromLatin1(fileData.toBase64());
-	QByteArray bytes = base64content.toUtf8();
+    QString base64Thumbnailcontent = generateThumbnailBase64(url);  //略缩图
+    QByteArray bytes = base64Thumbnailcontent.toUtf8();
 	Buffer buf(bytes.data(), bytes.length());
 
-	REQUESTMANAGER->SendMsg(goaltoken, MsgType::picture, "", buf);
+    FILETRANSMANAGER->AddReqRecord(fileid, filepath, filesize, md5);
+    REQUESTMANAGER->SendPicture(goaltoken, filename, filesize, md5, fileid,buf);
 }
 
 void ChatSessionModel::sendFile(const QString& goaltoken, const QString& url)
@@ -230,6 +297,7 @@ void ChatSessionModel::sendFile(const QString& goaltoken, const QString& url)
 	QFile file(url);
 	if (!file.open(QIODevice::ReadOnly)) {
 		qWarning() << "sendPicture error ,无法打开文件:" << url;
+        return;
 	}
 
 	QString filepath = url;
@@ -238,10 +306,10 @@ void ChatSessionModel::sendFile(const QString& goaltoken, const QString& url)
 	QString md5 = "";
 	qint64 filesize = file.size();
 
+    file.close();
+
 	FILETRANSMANAGER->AddReqRecord(fileid, filepath, filesize, md5);
 	REQUESTMANAGER->SendFile(goaltoken, filename, filesize, md5, fileid);
-
-	file.close();
 }
 
 bool ChatSessionModel::isMyToken(const QString& token)
@@ -253,7 +321,7 @@ void ChatSessionModel::startTrans(const QString& fileid)
 {
 	for (auto& chatmsg : m_messages)
 	{
-		if (chatmsg.fileid == fileid && chatmsg.type == MsgType::file)
+        if (chatmsg.fileid == fileid && (chatmsg.type == MsgType::file || chatmsg.type == MsgType::picture))
 		{
 			if (USERINFOMODEL->isMyToken(chatmsg.srctoken))
 			{
@@ -272,7 +340,7 @@ void ChatSessionModel::stopTrans(const QString& fileid)
 {
 	for (auto& chatmsg : m_messages)
 	{
-		if (chatmsg.fileid == fileid && chatmsg.type == MsgType::file)
+        if (chatmsg.fileid == fileid && (chatmsg.type == MsgType::file || chatmsg.type == MsgType::picture))
 		{
 			FILETRANSMANAGER->InterruptTask(chatmsg.fileid);
 			return;

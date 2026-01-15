@@ -118,29 +118,184 @@ Item {
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
-                                    if (!imgPreview.previewWindow) {
-                                        var component = Qt.createComponent(
-                                                    "ImgPreviewWindow.qml")
-                                        if (component.status === Component.Ready) {
-                                            const validSource = String(
-                                                                  imgPreview.source)
-                                            var win = component.createObject(
-                                                        root, {
-                                                            "imageSource": imgPreview.source
-                                                        })
-                                            imgPreview.previewWindow = win
-                                            imgPreview.previewWindow.onClosing.connect(
-                                                        function () {
-                                                            imgPreview.previewWindow.destroy()
-                                                            imgPreview.previewWindow = null
-                                                        })
-                                            imgPreview.previewWindow.show()
+                                    if(model.filestatus == 2)   //传输完成，打开预览
+                                    {
+                                        if (!imgPreview.previewWindow) {
+                                            var component = Qt.createComponent(
+                                                        "ImgPreviewWindow.qml")
+                                            if (component.status === Component.Ready) {
+                                                var win = component.createObject(
+                                                            root, {
+                                                                "imageSource": "file:///" + model.filepath
+                                                            })
+                                                imgPreview.previewWindow = win
+                                                imgPreview.previewWindow.onClosing.connect(
+                                                            function () {
+                                                                imgPreview.previewWindow.destroy()
+                                                                imgPreview.previewWindow = null
+                                                            })
+                                                imgPreview.previewWindow.show()
+                                            }
+                                        } else {
+                                            // 如果窗口已存在，则激活它
+                                            imgPreview.previewWindow.requestActivate()
                                         }
-                                    } else {
-                                        // 如果窗口已存在，则激活它
-                                        imgPreview.previewWindow.requestActivate()
+                                    }
+                                    if(model.filestatus == 0 || model.filestatus == 3)
+                                    {
+                                        sessionmodel.startTrans(model.fileid);
+                                    }
+                                    if(model.filestatus == 1)
+                                    {
+                                        sessionmodel.stopTrans(model.fileid);
                                     }
                                 }
+                            }
+                        }
+
+                        // 进度覆盖层
+                        Rectangle {
+                            id: progressOverlay
+                            visible: model.fileprogress < 100 || model.filestatus != 2
+                            anchors.fill: imgPreview
+                            color: "#80000000" // 半透明黑色蒙层
+                            radius: 4
+
+                            // 圆形进度条背景
+                            Rectangle {
+                                id: progressCircleBg
+                                width: 60
+                                height: 60
+                                radius: width / 2
+                                color: "#CC000000" // 半透明白色
+                                border.color: "#FFFFFF"
+                                border.width: 2
+                                anchors.centerIn: parent
+
+                                // 圆形进度条
+                                Canvas {
+                                    id: progressCircle
+                                    anchors.fill: parent
+                                    antialiasing: true
+
+                                    onPaint: {
+                                        var ctx = getContext("2d");
+                                        ctx.reset();
+
+                                        var centerX = width / 2;
+                                        var centerY = height / 2;
+                                        var radius = Math.min(centerX, centerY) - 3;
+
+                                        // 绘制进度圆弧
+                                        ctx.beginPath();
+                                        ctx.lineWidth = 3;
+                                        ctx.strokeStyle = "#FFFFFF";
+                                        ctx.arc(centerX, centerY, radius,
+                                               -Math.PI / 2,
+                                               -Math.PI / 2 + (2 * Math.PI * model.fileprogress / 100));
+                                        ctx.stroke();
+                                    }
+
+                                    Component.onCompleted: requestPaint()
+                                }
+
+                                // 中心状态图标
+                                Item {
+                                    id: statusIcon
+                                    width: 30
+                                    height: 30
+                                    anchors.centerIn: parent
+
+                                    // 传输中：两个竖条（暂停按钮）
+                                    Rectangle {
+                                        visible: model.filestatus == 1
+                                        anchors.centerIn: parent
+                                        width: 10
+                                        height: 20
+                                        color: "transparent"
+
+                                        Rectangle {
+                                            width: 3
+                                            height: 20
+                                            color: "#FFFFFF"
+                                            anchors.left: parent.left
+                                        }
+
+                                        Rectangle {
+                                            width: 3
+                                            height: 20
+                                            color: "#FFFFFF"
+                                            anchors.right: parent.right
+                                        }
+                                    }
+
+                                    // 暂停状态：播放按钮（向右三角形）
+                                    Canvas {
+                                        visible: model.filestatus == 0
+                                        anchors.fill: parent
+
+                                        onPaint: {
+                                            var ctx = getContext("2d");
+                                            ctx.reset();
+                                            ctx.fillStyle = "#FFFFFF";
+
+                                            // 绘制播放三角形
+                                            ctx.beginPath();
+                                            ctx.moveTo(5, 5);
+                                            ctx.lineTo(25, 15);
+                                            ctx.lineTo(5, 25);
+                                            ctx.closePath();
+                                            ctx.fill();
+                                        }
+
+                                        Component.onCompleted: requestPaint()
+                                    }
+
+                                    // 传输失败：叉号
+                                    Canvas {
+                                        visible: model.filestatus == 3
+                                        anchors.fill: parent
+
+                                        onPaint: {
+                                            var ctx = getContext("2d");
+                                            ctx.reset();
+                                            ctx.strokeStyle = "#FFFFFF";
+                                            ctx.lineWidth = 3;
+                                            ctx.lineCap = "round";
+
+                                            // 绘制叉号
+                                            ctx.beginPath();
+                                            ctx.moveTo(5, 5);
+                                            ctx.lineTo(25, 25);
+                                            ctx.stroke();
+
+                                            ctx.beginPath();
+                                            ctx.moveTo(25, 5);
+                                            ctx.lineTo(5, 25);
+                                            ctx.stroke();
+                                        }
+
+                                        Component.onCompleted: requestPaint()
+                                    }
+                                }
+                            }
+
+                            // 进度百分比文本
+                            Text {
+                                id: progressText
+                                anchors {
+                                    top: progressCircleBg.bottom
+                                    topMargin: 8
+                                    horizontalCenter: parent.horizontalCenter
+                                }
+                                text: {
+                                    if (model.filestatus == 3) return "失败";
+                                    if (model.filestatus == 0) return "已暂停";
+                                    return model.fileprogress + "%";
+                                }
+                                color: "#FFFFFF"
+                                font.pixelSize: 14
+                                font.bold: true
                             }
                         }
 
@@ -456,8 +611,6 @@ Item {
                                             var component = Qt.createComponent(
                                                         "3DModelViewer.qml")
                                             if (component.status === Component.Ready) {
-                                                const validSource = String(
-                                                                      model.filepath)
                                                 var win = component.createObject(
                                                             root, {
                                                                 "filepath": model.filepath
