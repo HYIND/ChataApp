@@ -4,7 +4,7 @@
 #include "NetWorkHelper.h"
 #include "Timer.h"
 
-constexpr int64_t taskexpiredseconds = 30;
+constexpr int64_t taskexpiredseconds = 1800;
 
 int64_t GetTimestampSeconds()
 {
@@ -133,6 +133,7 @@ void FileTransManager::AckTaskReq(BaseNetWorkSession *session, const json &js)
         js_reply["taskid"] = taskid;
     }
 
+    // 先发送5001，然后启动Upload
     NetWorkHelper::SendMessagePackage(session, &js_reply);
 
     if (type == 2)

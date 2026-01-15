@@ -113,7 +113,7 @@ bool MsgManager::BroadCastPublicChatMsg(const string &token, json &js_src, Buffe
     if (type == MsgType::picture && buf.Length() > 0)
         msg = string(buf.Byte(), buf.Length());
 
-    if (type == MsgType::file)
+    if (type == MsgType::file || type == MsgType::picture)
     {
         string filename = js_src["filename"];
         uint64_t filesize = js_src["filesize"];
@@ -134,6 +134,7 @@ bool MsgManager::BroadCastPublicChatMsg(const string &token, json &js_src, Buffe
                 .ip = sender->ip,
                 .port = sender->port,
                 .type = type,
+                .msg = msg,
                 .filename = filename,
                 .filesize = filesize,
                 .md5 = md5,
@@ -204,7 +205,7 @@ bool MsgManager::ForwardChatMsg(const string &srctoken, const string &goaltoken,
     if (type == MsgType::picture && buf_src.Length() > 0)
         msg = string(buf_src.Byte(), buf_src.Length());
 
-    if (type == MsgType::file)
+    if (type == MsgType::file || type == MsgType::picture)
     {
         string filename = js_src["filename"];
         uint64_t filesize = js_src["filesize"];
@@ -225,6 +226,10 @@ bool MsgManager::ForwardChatMsg(const string &srctoken, const string &goaltoken,
                 .ip = sender->ip,
                 .port = sender->port,
                 .type = type,
+                .msg = msg,
+                .filename = filename,
+                .filesize = filesize,
+                .md5 = md5,
                 .fileid = fileid});
     }
     else
@@ -315,7 +320,7 @@ bool MsgManager::ProcessFetchRecord(BaseNetWorkSession *session, const string &t
             js_record["msg"] = msgrecord.msg;
         }
 
-        if (msgrecord.type == MsgType::file)
+        if (msgrecord.type == MsgType::file || msgrecord.type == MsgType::picture)
         {
             js_record["filename"] = msgrecord.filename;
             js_record["filesize"] = msgrecord.filesize;

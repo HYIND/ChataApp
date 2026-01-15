@@ -155,7 +155,7 @@ long FileIOHandler::Seek(SeekOrigin origin, long offset)
         {
             throw std::system_error(errno, std::system_category(), "Seek failed");
         }
-        offset = result;
+        this->offset = result;
     }
     catch (const std::exception &e)
     {

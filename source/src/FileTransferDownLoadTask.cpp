@@ -152,8 +152,14 @@ void FileTransferDownLoadTask::InterruptTrans(BaseNetWorkSession *session)
         js_error["taskid"] = task_id;
         js_error["result"] = 0;
 
-        if (!NetWorkHelper::SendMessagePackage(session, &js_error))
-            IsNetworkEnable = false;
+        try
+        {
+            if (!NetWorkHelper::SendMessagePackage(session, &js_error))
+                IsNetworkEnable = false;
+        }
+        catch (...)
+        {
+        }
 
         OccurInterrupt();
     }
@@ -449,22 +455,6 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
     chunkdata.range_left = js.at("range").at(0);
     chunkdata.range_right = js.at("range").at(1);
 
-    // vector<uint8_t> bytes;
-    // error = !ExtractBinaryJson(js["data"], bytes);
-    // if (error)
-    // {
-    //     OccurError(session);
-    //     return;
-    // }
-    // chunkdata.FromBinary(bytes);
-
-    // if (chunkdata.buf.Length() < chunksize)
-    // {
-    //     error = true;
-    //     OccurError(session);
-    //     return;
-    // }
-
     if (buf.Remain() < chunksize)
     {
         error = true;
@@ -495,7 +485,7 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
 
         if (!error)
         {
-            chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_left + truthwritecount);
+            chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_right);
             chunk_map = mergeChunks(chunk_map);
             displayTransferProgress(file_size, chunk_map);
         }

@@ -30,8 +30,14 @@ void FileTransferUploadTask::InterruptTrans(BaseNetWorkSession *session)
         js_error["taskid"] = task_id;
         js_error["result"] = 0;
 
-        if (!NetWorkHelper::SendMessagePackage(session, &js_error))
-            IsNetworkEnable = false;
+        try
+        {
+            if (!NetWorkHelper::SendMessagePackage(session, &js_error))
+                IsNetworkEnable = false;
+        }
+        catch (...)
+        {
+        }
 
         OccurInterrupt();
     }
