@@ -7,6 +7,8 @@
 #include <QUuid>
 #include <QImage>
 #include <QBuffer>
+#include <QFileInfo>
+#include <QDir>
 
 QString generateThumbnailBase64(const QString& imagePath,
                                 int maxWidth = 320,
@@ -63,6 +65,29 @@ QString generateThumbnailBase64(const QString& imagePath,
     }
 
     return QString();
+}
+
+bool openExplorerAndSelectFile(const QString& filePath) {
+    QFileInfo fileInfo(filePath);
+
+    if (!fileInfo.exists()) {
+        return false;
+    }
+
+    std::wstring wpath = QDir::toNativeSeparators(
+                             fileInfo.absoluteFilePath()).toStdWString();
+
+    // 使用 ShellExecute
+    HINSTANCE result = ShellExecuteW(
+        NULL,                    // 父窗口句柄
+        L"open",                 // 操作
+        L"explorer",             // 程序
+        (L"/select,\"" + wpath + L"\"").c_str(),  // 参数
+        NULL,                    // 工作目录
+        SW_SHOWNORMAL            // 显示方式
+        );
+
+    return (int)result > 32;
 }
 
 ChatSessionModel::ChatSessionModel(QObject* parent)
@@ -346,4 +371,9 @@ void ChatSessionModel::stopTrans(const QString& fileid)
 			return;
 		}
 	}
+}
+
+void ChatSessionModel::selectFileinExplore(const QString &filepath)
+{
+    bool success = openExplorerAndSelectFile(filepath);
 }

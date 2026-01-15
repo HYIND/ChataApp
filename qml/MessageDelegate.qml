@@ -91,8 +91,8 @@ Item {
                     Rectangle {
                         id: messagebubble_picture
                         visible: model.type == 2
-                        width: Math.max(progressOverlay.width , imgPreview.width) + 20
-                        height: Math.max(progressOverlay.height , imgPreview.height) + 16
+                        width: (progressOverlay.visible ? Math.max(progressOverlay.width , imgPreview.width):imgPreview.width) + 20
+                        height: (progressOverlay.visible ? Math.max(progressOverlay.height , imgPreview.height):imgPreview.height) + 16
                         radius: 8
                         color: "#7cdcfe"
 
@@ -112,44 +112,6 @@ Item {
                             // 通过函数更新图片
                             function loadBase64(base64Data) {
                                 return "data:image/png;base64," + base64Data
-                            }
-
-                            property var previewWindow: null
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    if(model.filestatus == 2)   //传输完成，打开预览
-                                    {
-                                        if (!imgPreview.previewWindow) {
-                                            var component = Qt.createComponent(
-                                                        "ImgPreviewWindow.qml")
-                                            if (component.status === Component.Ready) {
-                                                var win = component.createObject(
-                                                            root, {
-                                                                "imageSource": "file:///" + model.filepath
-                                                            })
-                                                imgPreview.previewWindow = win
-                                                imgPreview.previewWindow.onClosing.connect(
-                                                            function () {
-                                                                imgPreview.previewWindow.destroy()
-                                                                imgPreview.previewWindow = null
-                                                            })
-                                                imgPreview.previewWindow.show()
-                                            }
-                                        } else {
-                                            // 如果窗口已存在，则激活它
-                                            imgPreview.previewWindow.requestActivate()
-                                        }
-                                    }
-                                    if(model.filestatus == 0 || model.filestatus == 3)
-                                    {
-                                        sessionmodel.startTrans(model.fileid);
-                                    }
-                                    if(model.filestatus == 1)
-                                    {
-                                        sessionmodel.stopTrans(model.fileid);
-                                    }
-                                }
                             }
                         }
 
@@ -301,10 +263,42 @@ Item {
                             }
                         }
 
-                        // 加载状态指示
-                        BusyIndicator {
-                            anchors.centerIn: parent
-                            running: parent.status === Image.Loading
+                        property var previewWindow: null
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                if(model.filestatus == 2)   //传输完成，打开预览
+                                {
+                                    if (!previewWindow) {
+                                        var component = Qt.createComponent(
+                                                    "ImgPreviewWindow.qml")
+                                        if (component.status === Component.Ready) {
+                                            var win = component.createObject(
+                                                        root, {
+                                                            "imageSource": "file:///" + model.filepath
+                                                        })
+                                            previewWindow = win
+                                            previewWindow.onClosing.connect(
+                                                        function () {
+                                                            previewWindow.destroy()
+                                                            previewWindow = null
+                                                        })
+                                            previewWindow.show()
+                                        }
+                                    } else {
+                                        // 如果窗口已存在，则激活它
+                                        previewWindow.requestActivate()
+                                    }
+                                }
+                                if(model.filestatus == 0 || model.filestatus == 3)
+                                {
+                                    sessionmodel.startTrans(model.fileid);
+                                }
+                                if(model.filestatus == 1)
+                                {
+                                    sessionmodel.stopTrans(model.fileid);
+                                }
+                            }
                         }
                     }
                 }
@@ -629,6 +623,9 @@ Item {
                                             // 如果窗口已存在，则激活它
                                             messagebubble_file.modelviewWindow.requestActivate()
                                         }
+                                    }
+                                    else {
+                                        sessionmodel.selectFileinExplore(model.filepath)
                                     }
                                 }
                             }

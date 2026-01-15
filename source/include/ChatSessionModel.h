@@ -59,6 +59,8 @@ public slots:
     void startTrans(const QString& fileid);
     void stopTrans(const QString& fileid);
 
+    void selectFileinExplore(const QString& filepath);
+
 signals:
     void sessionTokenChanged();
     void sessionTitleChanged();
