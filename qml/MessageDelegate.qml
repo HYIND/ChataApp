@@ -91,8 +91,8 @@ Item {
                     Rectangle {
                         id: messagebubble_picture
                         visible: model.type == 2
-                        width: imgPreview.width + 20
-                        height: imgPreview.height + 16
+                        width: Math.max(progressOverlay.width , imgPreview.width) + 20
+                        height: Math.max(progressOverlay.height , imgPreview.height) + 16
                         radius: 8
                         color: "#7cdcfe"
 
@@ -157,9 +157,11 @@ Item {
                         Rectangle {
                             id: progressOverlay
                             visible: model.fileprogress < 100 || model.filestatus != 2
-                            anchors.fill: imgPreview
                             color: "#80000000" // 半透明黑色蒙层
                             radius: 4
+                            anchors.centerIn: parent
+                            width: Math.max(150 , imgPreview.width)
+                            height: Math.max(150 , imgPreview.height)
 
                             // 圆形进度条背景
                             Rectangle {
@@ -289,8 +291,8 @@ Item {
                                     horizontalCenter: parent.horizontalCenter
                                 }
                                 text: {
-                                    if (model.filestatus == 3) return "失败";
-                                    if (model.filestatus == 0) return "已暂停";
+                                    if (model.filestatus == 3) return "加载失败";
+                                    if (model.filestatus == 0) return "点击加载";
                                     return model.fileprogress + "%";
                                 }
                                 color: "#FFFFFF"

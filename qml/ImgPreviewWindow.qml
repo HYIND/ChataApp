@@ -45,13 +45,9 @@ Window {
         id: imageDisplayLoader
         // 根据图片类型动态设置sourceComponent
         sourceComponent: {
-            if (!imageSource) {
-                return emptyComponent;
-            }
-
-            var processedSource = processImagePath(imageSource);
-            console.log("加载图片:", processedSource);
-            console.log("isGif:", isGifFile(imageSource));
+            // var processedSource = processImagePath(imageSource);
+            // console.log("加载图片:", processedSource);
+            // console.log("isGif:", isGifFile(imageSource));
 
             if (isGifFile(imageSource)) {
                 return gifComponent;
@@ -61,12 +57,12 @@ Window {
         }
 
         onLoaded: {
-            console.log("组件加载完成，item:", item);
+            // console.log("组件加载完成，item:", item);
             if (item) {
                 // 设置Loader的尺寸为内容的尺寸
                 width = item.width
                 height = item.height
-                console.log("Loader尺寸:", width, height);
+                // console.log("Loader尺寸:", width, height);
             }
         }
 
