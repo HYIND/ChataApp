@@ -6,7 +6,7 @@
 // 文件状态枚举
 enum class FileStoreStatus
 {
-    NOT_UPLOADED = 0,
+    SUSPEND = 0,
     UPLOADING = 1,
     COMPLETED = 2
 };
@@ -22,7 +22,7 @@ struct FileRecord
     std::string path;
 
     FileRecord(std::string id = "",
-               FileStoreStatus s = FileStoreStatus::NOT_UPLOADED,
+               FileStoreStatus s = FileStoreStatus::SUSPEND,
                std::string m = "",
                uint64_t size = 0,
                uint64_t timestamp = 0,

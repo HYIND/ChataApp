@@ -45,6 +45,7 @@ public:
     void OnDownloadProgress(FileTransferDownLoadTask *task, uint32_t progress);
 
     void SetLoginUserManager(LoginUserManager *m);
+    void SessionClose(BaseNetWorkSession* session);
 
 private:
     FileTransManager();

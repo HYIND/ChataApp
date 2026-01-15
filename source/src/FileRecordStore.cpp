@@ -88,7 +88,7 @@ bool FileRecordStore::addFileRecord(std::string fileId,
     std::string actualPath = generatePath(fileId);
     uint64_t timestamp = GetTimeStampSecond();
 
-    re = new FileRecord(fileId, FileStoreStatus::NOT_UPLOADED, md5, filesize, timestamp, actualPath);
+    re = new FileRecord(fileId, FileStoreStatus::SUSPEND, md5, filesize, timestamp, actualPath);
     bool result = records_.Insert(fileId, re);
     if (!result)
     {
@@ -174,7 +174,7 @@ FileStoreStatus FileRecordStore::getStatus(const std::string &fileId)
 {
     FileRecord *re = nullptr;
     if (!records_.Find(fileId, re))
-        return FileStoreStatus::NOT_UPLOADED;
+        return FileStoreStatus::SUSPEND;
 
     return re->status;
 }

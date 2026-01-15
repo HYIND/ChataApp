@@ -121,6 +121,7 @@ void FileTransManager::AckTaskReq(BaseNetWorkSession *session, const json &js)
         {
             if (record.status != FileStoreStatus::COMPLETED)
             {
+                FILERECORDSTORE->updateFileRecordStatus(fileid, FileStoreStatus::UPLOADING);
                 AddDownloadTask(fileid, taskid, record.path, record.filesize, session);
             }
         }
@@ -253,12 +254,24 @@ void FileTransManager::OnUploadFinish(FileTransferUploadTask *task)
 void FileTransManager::OnUploadError(FileTransferUploadTask *task)
 {
     string taskid = task->TaskId();
+    {
+        FileTransTaskContent *content = nullptr;
+        auto guard = m_tasks.MakeLockGuard();
+        if (!m_tasks.Find(taskid, content) && content)
+            FILERECORDSTORE->updateFileRecordStatus(content->fileid, FileStoreStatus::SUSPEND);
+    }
     DeleteTask(taskid);
 }
 
 void FileTransManager::OnUploadInterrupt(FileTransferUploadTask *task)
 {
     string taskid = task->TaskId();
+    {
+        FileTransTaskContent *content = nullptr;
+        auto guard = m_tasks.MakeLockGuard();
+        if (!m_tasks.Find(taskid, content) && content)
+            FILERECORDSTORE->updateFileRecordStatus(content->fileid, FileStoreStatus::SUSPEND);
+    }
     DeleteTask(taskid);
 }
 
@@ -295,4 +308,28 @@ void FileTransManager::OnDownloadProgress(FileTransferDownLoadTask *task, uint32
 void FileTransManager::SetLoginUserManager(LoginUserManager *m)
 {
     HandleLoginUser = m;
+}
+
+void FileTransManager::SessionClose(BaseNetWorkSession *session)
+{
+    auto guard = m_tasks.MakeLockGuard();
+    std::map<std::string, FileTransTaskContent *> closeTasks;
+    m_tasks.EnsureCall([&](std::map<std::string, FileTransTaskContent *> &map) -> void
+                       {
+                        for(auto pair:map){
+                            FileTransTaskContent * content = pair.second;
+                            if(!content||!content->task)
+                            {
+                                closeTasks[pair.first]= pair.second;
+                                continue;
+                            }
+                            if(content->session == session)
+                            {
+                                closeTasks[pair.first]= pair.second;
+                            }
+                        } 
+                        for(auto &pair : closeTasks)
+                        {
+                            DeleteTask(pair.first);
+                        } });
 }

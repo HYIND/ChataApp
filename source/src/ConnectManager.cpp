@@ -1,4 +1,5 @@
 #include "ConnectManager.h"
+#include "FileTransManager.h"
 
 void ConnectManager::callBackSessionEstablish(BaseNetWorkSession *session)
 {
@@ -38,12 +39,10 @@ void ConnectManager::callBackCloseConnect(BaseNetWorkSession *session)
     std::cout << fmt::format("Client Connection Close: RemoteIpAddr={}:{} \n",
                              session->GetIPAddr(), session->GetPort());
 
-    bool success = false;
     if (HandleLoginUser)
         HandleLoginUser->Logout(session, session->GetIPAddr(), session->GetPort());
-    if (success)
-    {
-    }
+
+    FILETRANSMANAGER->SessionClose(session);
 
     sessions.EnsureCall(
         [&](std::vector<BaseNetWorkSession *> &array) -> void
