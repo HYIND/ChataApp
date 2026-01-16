@@ -8,6 +8,7 @@
 #include "LoginModel.h"
 #include "AIAssistantModel.h"
 #include "AISummaryModel.h"
+#include "OCRModel.h"
 
 class ModelManager:public QObject
 {
@@ -22,6 +23,7 @@ public:
     LoginModel* loginmodel() const { return m_loginmodel; }
     AIAssistantModel* aiassistantModel() const {return m_aiassistantmodel;}
     AISummaryModel* aisummaryModel() const{return m_aisummarymodel;}
+    OCRModel* ocrModel() const{return m_ocrmodel;}
 
 private:
     explicit ModelManager(QObject* parent = nullptr);
@@ -33,6 +35,7 @@ private:
     LoginModel* m_loginmodel;
     AIAssistantModel* m_aiassistantmodel;
     AISummaryModel* m_aisummarymodel;
+    OCRModel* m_ocrmodel;
 };
 
 #define MODELMANAGER ModelManager::Instance()
@@ -42,6 +45,7 @@ private:
 #define LOGINMODEL ModelManager::Instance()->loginmodel()
 #define AIASSISTANTMODEL ModelManager::Instance()->aiassistantModel()
 #define AISUMMARYMODEL ModelManager::Instance()->aisummaryModel()
+#define OCRMODEL ModelManager::Instance()->ocrModel()
 
 
 #endif // MODELMANAGER_H

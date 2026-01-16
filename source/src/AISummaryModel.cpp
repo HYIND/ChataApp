@@ -151,7 +151,7 @@ QString AISummaryModel::GetInputTextFromChatMsgs(QList<ChatMsg> &chatmsgs)
     }
 
     // 添加统计信息
-    result.append(QString("\n\n总计: %1 条文字消息, %2 条媒体消息")
+    result.append(QString("\n\n总计: %1条文字消息, %2条媒体消息")
                       .arg(textCount)
                       .arg(mediaCount));
 

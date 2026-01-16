@@ -45,6 +45,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("loginmodel", LOGINMODEL);
     engine.rootContext()->setContextProperty("aiassistantmodel", AIASSISTANTMODEL);
     engine.rootContext()->setContextProperty("aisummarymodel", AISUMMARYMODEL);
+    engine.rootContext()->setContextProperty("ocrmodel", OCRMODEL);
     engine.load(url);
 
     // 创建局部事件循环和超时控制器等待子线程完成初始化

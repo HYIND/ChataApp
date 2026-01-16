@@ -267,14 +267,13 @@ QString FileTransManager::DownloadDir()
 QString FileTransManager::FindDownloadPathByFileId(const QString &fileid)
 {
     QString result = "";
-    m_tasks.EnsureCall(
-        [&](std::map<QString, FileTransTaskContent*>& map) ->void {
+    m_reqrecords.EnsureCall(
+        [&](std::map<QString, FileReqRecord*>& map) ->void {
             for (auto& task : map)
             {
-                if (task.second->fileid == fileid)
+                if (task.second->fileid == fileid && task.second->status == transstatus::done)
                 {
-                    FileTransTaskContent* content = task.second;
-                    result = content->task->FilePath();
+                    result = task.second->filepath;
                     return;
                 }
             }
@@ -365,7 +364,7 @@ void FileTransManager::OnDownloadFinish(FileTransferDownLoadTask* task)
 
 	updateReqRecordStatus(content->fileid, transstatus::done);
 	CHATITEMMODEL->fileTransFinished(content->fileid);
-	DeleteTask(taskid);
+    DeleteTask(taskid);
 }
 
 void FileTransManager::OnDownloadError(FileTransferDownLoadTask* task)

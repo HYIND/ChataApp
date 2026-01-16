@@ -275,7 +275,9 @@ Item {
                                         if (component.status === Component.Ready) {
                                             var win = component.createObject(
                                                         root, {
-                                                            "imageSource": "file:///" + model.filepath
+                                                            "imageSource": "file:///" + model.filepath,
+                                                            "fileid": model.fileid,
+                                                            "ocrmodel": ocrmodel
                                                         })
                                             previewWindow = win
                                             previewWindow.onClosing.connect(

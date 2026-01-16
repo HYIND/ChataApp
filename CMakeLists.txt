@@ -27,6 +27,8 @@ set(APP_SOURCES
     source/src/LlamaClient.cpp
     source/src/AIAssistantModel.cpp
     source/src/AISummaryModel.cpp
+    source/src/OCRModel.cpp
+    source/src/OCRProcess.cpp
 
 
     source/network/QCustomTcpSession.cpp
@@ -59,6 +61,8 @@ set(APP_INCLUDES
     source/include/LlamaClient.h
     source/include/AIAssistantModel.h
     source/include/AISummaryModel.h
+    source/include/OCRModel.h
+    source/include/OCRProcess.h
 
 
     source/network/QCustomTcpSession.h
@@ -103,6 +107,7 @@ qt_add_qml_module(appchat_qml_client
 )
 
 include_directories(source/include source/network ThirdParty/ ThirdParty/llama.cpp)
+include_directories(source/include source/network ThirdParty/ ThirdParty/tesseract)
 
 target_include_directories(appchat_qml_client
     PRIVATE
@@ -153,4 +158,8 @@ install(TARGETS appchat_qml_client
 )
 
 target_link_libraries(appchat_qml_client PRIVATE ${CMAKE_SOURCE_DIR}/lib/llama.lib)
+target_link_libraries(appchat_qml_client PRIVATE ${CMAKE_SOURCE_DIR}/lib/tesseract55.lib)
+target_link_libraries(appchat_qml_client PRIVATE ${CMAKE_SOURCE_DIR}/lib/leptonica-1.87.0.lib)
+
+
 

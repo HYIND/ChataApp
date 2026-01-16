@@ -13,4 +13,5 @@ ModelManager::ModelManager(QObject* parent){
     m_loginmodel = new LoginModel();
     m_aiassistantmodel = new AIAssistantModel();
     m_aisummarymodel = new AISummaryModel();
+    m_ocrmodel = new OCRModel();
 }

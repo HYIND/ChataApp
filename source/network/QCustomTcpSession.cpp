@@ -321,7 +321,7 @@ void CustomTcpSession::ProcessPakage(CustomPackage *newPak)
                     task->respsonse->CopyFromBuf(pak->buffer);
 
                 int count = 0;
-                while (!task->status == -1 && count < 5)
+                while (!(task->status == -1) && count < 5)
                 {
                     count++;
                     Sleep(10);

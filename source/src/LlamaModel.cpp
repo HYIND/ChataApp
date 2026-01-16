@@ -1515,6 +1515,8 @@ bool LlamaModelLoader::load(const std::string &model_path)
         qDebug()<<("错误: 模型加载失败\n");
         return false;
     }
+
+    return true;
 }
 
 bool LlamaModelLoader::isLoaded()
