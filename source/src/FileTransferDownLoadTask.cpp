@@ -1,5 +1,6 @@
 #include "FileTransferDownLoadTask.h"
 #include "NetWorkHelper.h"
+#include "MD5Helper.h"
 
 #define enabledisplay 0
 
@@ -89,42 +90,8 @@ std::string getChunkFilePath(const std::string &filepath)
     return filepath + "__chunks";
 }
 
-bool ExtractBinaryJson(json jsbinary, std::vector<uint8_t> &v)
-{
-    bool result = false;
-    if (jsbinary.is_object() && jsbinary.contains("bytes"))
-    {
-        const auto &bytes_field = jsbinary["bytes"];
-        if (bytes_field.is_array())
-        {
-            try
-            {
-                const size_t size = bytes_field.size();
-                v.reserve(v.size() + size); // 预分配空间
-
-                for (const auto &item : bytes_field)
-                {
-                    if (!item.is_number())
-                    {
-                        v.clear();
-                        return false;
-                    }
-                    v.push_back(static_cast<uint8_t>(item.get<int>()));
-                }
-                result = true;
-            }
-            catch (const json::exception &e)
-            {
-                cout << "error when ExtractBinaryJson: " + std::string(e.what()) << endl;
-                result = false;
-            }
-        }
-    }
-    return result;
-}
-
-FileTransferDownLoadTask::FileTransferDownLoadTask(const string &taskid, const string &filepath_dir)
-    : FileTransferTask(taskid, filepath_dir)
+FileTransferDownLoadTask::FileTransferDownLoadTask(const string &taskid, const string &filepath, const string &md5)
+    : FileTransferTask(taskid, filepath, md5)
 {
 }
 
@@ -277,7 +244,7 @@ bool FileTransferDownLoadTask::ParseFile()
     return IsFileEnable;
 }
 
-bool FileTransferDownLoadTask::CheckFinish()
+bool FileTransferDownLoadTask::CheckTransFinish()
 {
     return getUntransferredChunks(chunk_map, file_size).empty();
 }
@@ -502,14 +469,21 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
     }
 
     json js_reply;
-    bool finished = CheckFinish();
+    bool finished = CheckTransFinish();
     if (finished)
     {
         file_io.Truncate(file_size);
-
-        js_reply["command"] = 8010;
-        js_reply["taskid"] = task_id;
-        js_reply["result"] = 1;
+        if (!MD5Helper::verifyFileMD5(file_path, _md5))
+        {
+            OccurError(session);
+            return;
+        }
+        else
+        {
+            js_reply["command"] = 8010;
+            js_reply["taskid"] = task_id;
+            js_reply["result"] = 1;
+        }
     }
     else
     {
@@ -552,21 +526,29 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(BaseNetWorkSession *session, 
 
 void FileTransferDownLoadTask::AckRecvFinished(BaseNetWorkSession *session, const json &js)
 {
-    if (CheckFinish())
+    if (CheckTransFinish())
     {
-        file_io.Truncate(file_size);
-        OccurFinish();
+        if (!IsFileEnable)
+            IsFileEnable = file_io.Open(file_path, FileIOHandler::OpenMode::READ_WRITE);
+        if (IsFileEnable)
+            file_io.Truncate(file_size);
     }
 
     if (IsFinished)
     {
-        json js_reply;
-        js_reply["command"] = 8010;
-        js_reply["taskid"] = task_id;
-        js_reply["result"] = IsFinished ? 1 : 0;
+        if (!MD5Helper::verifyFileMD5(file_path, _md5))
+            OccurError(session);
+        else
+        {
+            json js_reply;
+            js_reply["command"] = 8010;
+            js_reply["taskid"] = task_id;
+            js_reply["result"] = IsFinished ? 1 : 0;
 
-        if (!NetWorkHelper::SendMessagePackage(session, &js_reply))
-            IsNetworkEnable = false;
+            if (!NetWorkHelper::SendMessagePackage(session, &js_reply))
+                IsNetworkEnable = false;
+            OccurFinish();
+        }
     }
     else
     {
@@ -749,9 +731,10 @@ void FileTransferDownLoadTask::BindProgressCallBack(std::function<void(FileTrans
     _callbackProgress = callback;
 }
 
-void FileTransferDownLoadTask::RegisterTransInfo(const string &filepath, uint64_t filesize)
+void FileTransferDownLoadTask::RegisterTransInfo(const string &filepath, const string &md5, uint64_t filesize)
 {
     file_path = filepath;
+    _md5 = md5;
     file_size = filesize;
     IsRegister = true;
 }

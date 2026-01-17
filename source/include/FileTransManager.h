@@ -45,12 +45,12 @@ public:
     void OnDownloadProgress(FileTransferDownLoadTask *task, uint32_t progress);
 
     void SetLoginUserManager(LoginUserManager *m);
-    void SessionClose(BaseNetWorkSession* session);
+    void SessionClose(BaseNetWorkSession *session);
 
 private:
     FileTransManager();
     bool AddUploadTask(const string &fileid, const string &taskid, const string &filepath, BaseNetWorkSession *session);
-    bool AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, uint64_t filesize, BaseNetWorkSession *session);
+    bool AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, const string &md5, uint64_t filesize, BaseNetWorkSession *session);
     void DeleteTask(const string &taskid);
     void CleanExpireTask();
     void UpdateTimeStamp(const string &taskid);

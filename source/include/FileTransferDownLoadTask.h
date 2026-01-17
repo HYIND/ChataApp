@@ -4,7 +4,7 @@
 class FileTransferDownLoadTask : public FileTransferTask
 {
 public:
-    FileTransferDownLoadTask(const string &taskid, const string &filepath_dir = "");
+    FileTransferDownLoadTask(const string &taskid, const string &filepath = "", const string &md5 = "");
     virtual ~FileTransferDownLoadTask();
 
 public:
@@ -17,7 +17,7 @@ public:
     void BindInterruptedCallBack(std::function<void(FileTransferDownLoadTask *)> callback);
     void BindProgressCallBack(std::function<void(FileTransferDownLoadTask *, uint32_t)> callback);
 
-    void RegisterTransInfo(const string &filepath, uint64_t filesize); // 使用提前注册好的传输信息，而非被动接收对方的信息，在确认信息时执行校验行为
+    void RegisterTransInfo(const string &filepath, const string &md5, uint64_t filesize); // 使用提前注册好的传输信息，而非被动接收对方的信息，在确认信息时执行校验行为
 protected:
     virtual void OnError();
     virtual void OnFinished();
@@ -44,7 +44,7 @@ private:
     bool ReadChunkFile();
     bool ParseChunkMap(const json &js);
     bool WriteToChunkFile();
-    bool CheckFinish();
+    bool CheckTransFinish();
 
 protected:
     std::function<void(FileTransferDownLoadTask *)> _callbackError;

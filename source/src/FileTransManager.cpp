@@ -122,7 +122,7 @@ void FileTransManager::AckTaskReq(BaseNetWorkSession *session, const json &js)
             if (record.status != FileStoreStatus::COMPLETED)
             {
                 FILERECORDSTORE->updateFileRecordStatus(fileid, FileStoreStatus::UPLOADING);
-                AddDownloadTask(fileid, taskid, record.path, record.filesize, session);
+                AddDownloadTask(fileid, taskid, record.path, record.md5, record.filesize, session);
             }
         }
     }
@@ -174,14 +174,14 @@ bool FileTransManager::AddUploadTask(const string &fileid, const string &taskid,
     return result;
 }
 
-bool FileTransManager::AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, uint64_t filesize, BaseNetWorkSession *session)
+bool FileTransManager::AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, const string &md5, uint64_t filesize, BaseNetWorkSession *session)
 {
     FileTransTaskContent *content = nullptr;
     if (m_tasks.Find(taskid, content))
         return false;
 
     FileTransferDownLoadTask *downloadtask = new FileTransferDownLoadTask(taskid);
-    downloadtask->RegisterTransInfo(filepath, filesize);
+    downloadtask->RegisterTransInfo(filepath, md5, filesize);
     downloadtask->BindErrorCallBack(std::bind(&FileTransManager::OnDownloadError, this, std::placeholders::_1));
     downloadtask->BindFinishedCallBack(std::bind(&FileTransManager::OnDownloadFinish, this, std::placeholders::_1));
     downloadtask->BindInterruptedCallBack(std::bind(&FileTransManager::OnDownloadInterrupt, this, std::placeholders::_1));

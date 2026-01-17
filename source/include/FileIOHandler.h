@@ -37,6 +37,7 @@ public:
 public:
     long Read(char *buf, size_t bytesToRead);
     long Read(Buffer &buf, size_t bytesToRead);
+    long Read(Buffer &buffer);
     long Write(const char *buf, size_t bytesToWrite);
     long Write(const Buffer &buf);
     long Seek(SeekOrigin origin, long offset = 0);
@@ -56,10 +57,10 @@ private:
     bool CheckOpen() const;
 
 private:
-    int fd = -1;
-    std::string file_path;
-    OpenMode mode;
-    long offset;
-    mutable CriticalSectionLock mutex;
-    mode_t file_mode_ = 0644;
+    int _fd;
+    std::string _filepath;
+    OpenMode _mode;
+    long _offset;
+    mutable CriticalSectionLock _mutex;
+    mode_t _filemode;
 };

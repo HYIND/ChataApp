@@ -9,9 +9,13 @@
 
 FileIOHandler::FileIOHandler()
 {
+    _fd = -1;
+    _offset = 0;
+    _filemode = 0644;
 }
 
 FileIOHandler::FileIOHandler(const std::string &filepath, OpenMode mode)
+    : FileIOHandler()
 {
     Open(filepath, mode);
 }
@@ -23,87 +27,81 @@ FileIOHandler::~FileIOHandler()
 
 bool FileIOHandler::Open(const std::string &path, OpenMode mode)
 {
-    mutex.Enter();
+    LockGuard guard(_mutex);
     bool result = false;
     try
     {
         Close();
 
-        fd = ::open(path.c_str(), mode, file_mode_);
-        if (fd != -1)
-        {
-            result = true;
-            file_path = path;
-            offset = 0;
-        }
+        _filepath = path;
+        _mode = mode;
+        _offset = 0;
+
+        _fd = ::open(path.c_str(), mode, _filemode);
+        if (_fd == -1)
+            return false;
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
     }
-    mutex.Leave();
-    return result;
+    return true;
 }
 
 void FileIOHandler::Close()
 {
-    mutex.Enter();
+    LockGuard guard(_mutex);
     try
     {
-        if (fd != -1)
+        if (_fd != -1)
         {
-            ::close(fd);
-            fd = -1;
+            ::close(_fd);
+            _fd = -1;
         }
-        file_path.clear();
+        _filepath.clear();
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
     }
-    mutex.Leave();
 }
 
 bool FileIOHandler::IsOpen() const
 {
-    return fd != -1;
+    return _fd != -1;
 }
 
 std::string FileIOHandler::FilePath() const
 {
-    return file_path;
+    return _filepath;
 }
 
 long FileIOHandler::Read(char *buf, size_t bytesToRead)
 {
-    mutex.Enter();
+    LockGuard guard(_mutex);
     long result = 0;
     try
     {
         if (!CheckOpen())
-        {
-            mutex.Leave();
             return result;
-        }
 
-        result = ::read(fd, (void *)buf, bytesToRead);
+        result = ::read(_fd, (void *)buf, bytesToRead);
         if (result < 0)
         {
-            mutex.Leave();
             throw std::system_error(errno, std::system_category(), "Read failed");
         }
-        offset += result;
+        _offset += result;
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
     }
-    mutex.Leave();
     return result;
 }
 
 long FileIOHandler::Read(Buffer &buffer, size_t bytesToRead)
 {
+    LockGuard guard(_mutex);
     // 确保Buffer有足够空间
     if (buffer.Remain() < static_cast<int>(bytesToRead))
     {
@@ -113,26 +111,42 @@ long FileIOHandler::Read(Buffer &buffer, size_t bytesToRead)
     return result;
 }
 
+long FileIOHandler::Read(Buffer &buffer)
+{
+    LockGuard guard(_mutex);
+    if (GetSize() <= 0)
+        return 0;
+
+    size_t bytesToRead = GetSize();
+    // 确保Buffer有足够空间
+    if (buffer.Remain() < static_cast<uint64_t>(bytesToRead))
+    {
+        buffer.ReSize(buffer.Position() + bytesToRead);
+    }
+    Seek(SeekOrigin::BEGIN, 0);
+    int result = Read(buffer.Byte() + buffer.Position(), bytesToRead);
+    return result;
+}
+
 long FileIOHandler::Write(const char *buf, size_t bytesToWrite)
 {
-    mutex.Enter();
+    LockGuard guard(_mutex);
     long result = 0;
     try
     {
         if (!CheckOpen())
             return result;
-        result = ::write(fd, (const void *)buf, bytesToWrite);
+        result = ::write(_fd, (const void *)buf, bytesToWrite);
         if (result < 0)
         {
             throw std::system_error(errno, std::system_category(), "Write failed");
         }
-        offset += result;
+        _offset += result;
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
     }
-    mutex.Leave();
     return result;
 }
 
@@ -143,61 +157,55 @@ long FileIOHandler::Write(const Buffer &buf)
 
 long FileIOHandler::Seek(SeekOrigin origin, long offset)
 {
-    mutex.Enter();
+    LockGuard guard(_mutex);
     long result = 0;
     try
     {
         if (!CheckOpen())
             return result;
 
-        result = ::lseek(fd, offset, origin);
+        result = ::lseek(_fd, offset, origin);
         if (result == -1)
         {
             throw std::system_error(errno, std::system_category(), "Seek failed");
         }
-        this->offset = result;
+        _offset = result;
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
     }
-    mutex.Leave();
     return result;
 }
 
 bool FileIOHandler::Flush()
 {
-    mutex.Enter();
+    LockGuard guard(_mutex);
     bool result = false;
     try
     {
         if (!CheckOpen())
             return false;
-        result = ::fsync(fd) == 0;
+        result = ::fsync(_fd) == 0;
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
     }
-
-    mutex.Leave();
     return result;
 }
 
 long FileIOHandler::GetSize() const
 {
-    mutex.Enter();
+    LockGuard guard(_mutex);
     long result = 0;
     try
     {
         if (!CheckOpen())
-        {
-            mutex.Leave();
             return result;
-        }
 
-        struct stat st;
-        if (::fstat(fd, &st) == -1)
+        struct stat64 st;
+        if (::fstat64(_fd, &st) == -1)
         {
             throw std::system_error(errno, std::system_category(), "GetSize failed");
         }
@@ -207,28 +215,24 @@ long FileIOHandler::GetSize() const
     {
         std::cerr << e.what() << '\n';
     }
-    mutex.Leave();
     return result;
 }
 
 bool FileIOHandler::Truncate(off_t size)
 {
-    mutex.Enter();
+    LockGuard guard(_mutex);
     bool result = false;
     try
     {
         if (!CheckOpen())
-        {
-            mutex.Leave();
             return result;
-        }
-        result = ::ftruncate(fd, size) == 0;
+
+        result = ::ftruncate(_fd, size) == 0;
     }
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
     }
-    mutex.Leave();
     return result;
 }
 
@@ -380,10 +384,10 @@ bool FileIOHandler::RenameFile(const std::string &oripath, const std::string &ne
 
 bool FileIOHandler::CheckOpen() const
 {
-    if (fd == -1)
+    if (_fd == -1)
     {
-        return false;
         errno = EBADF;
+        return false;
     }
     return true;
 }
