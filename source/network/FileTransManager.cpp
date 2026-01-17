@@ -140,16 +140,21 @@ void FileTransManager::AckTaskRes(const json& js)
 			else
 			{
 				re->trycount++;
-				if (re->trycount < 5)
+                if (re->trycount < 3)
 				{
 					QTimer* timer = new QTimer();
-					timer->setSingleShot(true);
+                    timer->setSingleShot(true);
 					// 连接定时器的 timeout 信号到槽函数
 					QObject::connect(timer, &QTimer::timeout, [this, fileid]() {
+                        CHATITEMMODEL->fileTransProgressChange(fileid,0);
 						this->ReqDownloadFile(fileid);
 						});
-					timer->start(3000);
+                    timer->start(1500);
 				}
+                else
+                {
+                    CHATITEMMODEL->fileTransError(fileid);
+                }
 			}
 		}
 	}

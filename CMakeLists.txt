@@ -102,6 +102,7 @@ qt_add_qml_module(appchat_qml_client
         qml/3DModelViewer.qml
         qml/LlamaChatWindow.qml
         qml/TipPopup.qml
+        qml/videoPreviewWindow.qml
     RESOURCES
         resource.qrc
 )

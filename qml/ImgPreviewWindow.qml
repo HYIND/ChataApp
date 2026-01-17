@@ -19,8 +19,8 @@ Window {
     // 窗口设置
     width: Math.max(controlBar.width ,imageDisplayLoader.width)
     height: controlBar.height + imageDisplayLoader.height
-    x : (Screen.width - imageDisplayLoader.width)/2
-    y : (Screen.height - imageDisplayLoader.height)/2
+    x : (Screen.width - width)/2
+    y : (Screen.height - height)/2
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "#50f5f5f5"
 
@@ -92,11 +92,40 @@ Window {
             id: controlBar
             width: Math.max(200, parent.width)
             height: 40
-            color: "#00000000"  // 半透明黑色
+            color: "white"
             radius: 8
+
+            Item {
+                anchors.left: parent.left
+                width: parent.width - (rightButtonRow.width + rightButtonRow.anchors.margins)
+                height: parent.height
+
+                MouseArea
+                {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton
+
+                    propagateComposedEvents: true
+
+                    onPressed: function(mouse) {
+                        dragStart = Qt.point(mouse.x, mouse.y);
+                    }
+                    onPositionChanged: function(mouse) {
+                        dragging = true;
+                        if (dragging) {
+                            imagePreviewWindow.x += mouse.x - dragStart.x;
+                            imagePreviewWindow.y += mouse.y - dragStart.y;
+                        }
+                    }
+                    onReleased: {
+                        dragging = false;
+                    }
+                }
+            }
 
             // 右上角按钮区域
             Row {
+                id: rightButtonRow
                 anchors.top: parent.top
                 anchors.right: parent.right
                 anchors.margins: 4
@@ -304,12 +333,50 @@ Window {
         id: imageComponent
         Item
         {
-            width: Math.min(Screen.width * 0.9,  Math.max(innerImage.sourceSize.width,200))
-            height: Math.min(Screen.height * 0.9,  Math.max(innerImage.sourceSize.height,200))
+            width: Math.max(innerImage.width,200)
+            height: Math.max(innerImage.height,200)
+
             Image {
+
+                function getFitWidth()
+                {
+                    let maxvideoheight = Screen.height * 0.9 - controlBar.height
+                    let maxvideowidth = Screen.width * 0.9
+
+                    let scaleByWidth = maxvideowidth / sourceSize.width
+                    let scaleByHeight = maxvideoheight / sourceSize.height
+                    let scale = Math.min(scaleByWidth, scaleByHeight)
+
+                    if(scale < 1.0)
+                    {
+                        let newWidth = sourceSize.width * scale
+                        return newWidth;
+                    }
+                    else
+                        return sourceSize.width
+                }
+                function getFitHeight()
+                {
+                    let maxvideoheight = Screen.height * 0.9 - controlBar.height
+                    let maxvideowidth = Screen.width * 0.9
+
+                    let scaleByWidth = maxvideowidth / sourceSize.width
+                    let scaleByHeight = maxvideoheight / sourceSize.height
+                    let scale = Math.min(scaleByWidth, scaleByHeight)
+
+
+                    if(scale < 1.0)
+                    {
+                        let newHeight = sourceSize.height * scale
+                        return newHeight;
+                    }
+                    else
+                        return sourceSize.height
+                }
+
                 id: innerImage
-                width: Math.min(parent.width,  innerImage.sourceSize.width)
-                height: Math.min(parent.height, innerImage.sourceSize.height)
+                width: getFitWidth()
+                height: getFitHeight()
                 anchors.centerIn: parent
                 fillMode: Image.PreserveAspectFit
                 source: processImagePath(imageSource)
@@ -330,14 +397,53 @@ Window {
         id: gifComponent
         Item
         {
-            width: Math.min(Screen.width * 0.9,  Math.max(innerGifImage.sourceSize.width,200))
-            height: Math.min(Screen.height * 0.9,  Math.max(innerGifImage.sourceSize.height,200))
+            width: Math.max(innerGifImage.width,200)
+            height: Math.max(innerGifImage.height,200)
+
             AnimatedImage {
+
+                function getFitWidth()
+                {
+                    let maxvideoheight = Screen.height * 0.9 - controlBar.height
+                    let maxvideowidth = Screen.width * 0.9
+
+                    let scaleByWidth = maxvideowidth / sourceSize.width
+                    let scaleByHeight = maxvideoheight / sourceSize.height
+                    let scale = Math.min(scaleByWidth, scaleByHeight)
+
+                    if(scale < 1.0)
+                    {
+                        let newWidth = sourceSize.width * scale
+                        return newWidth;
+                    }
+                    else
+                        return sourceSize.width
+                }
+                function getFitHeight()
+                {
+                    let maxvideoheight = Screen.height * 0.9 - controlBar.height
+                    let maxvideowidth = Screen.width * 0.9
+
+                    let scaleByWidth = maxvideowidth / sourceSize.width
+                    let scaleByHeight = maxvideoheight / sourceSize.height
+                    let scale = Math.min(scaleByWidth, scaleByHeight)
+
+
+                    if(scale < 1.0)
+                    {
+                        let newHeight = sourceSize.height * scale
+                        return newHeight;
+                    }
+                    else
+                        return sourceSize.height
+                }
+
+
                 id: innerGifImage
                 playing: true  // 默认自动播放
                 speed: 1.0     // 播放速度（1.0=正常）
-                width: Math.min(parent.width,  innerGifImage.sourceSize.width)
-                height: Math.min(parent.height, innerGifImage.sourceSize.height)
+                width: getFitWidth()
+                height: getFitHeight()
                 anchors.centerIn: parent
                 fillMode: Image.PreserveAspectFit
                 source: processImagePath(imageSource)

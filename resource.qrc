@@ -13,6 +13,7 @@
         <file>qml/3DModelViewer.qml</file>
         <file>qml/LlamaChatWindow.qml</file>
         <file>qml/TipPopup.qml</file>
+        <file>qml/videoPreviewWindow.qml</file>
     </qresource>
     <qresource prefix="/icon">
         <file>assets/images/AIChatLogo.png</file>

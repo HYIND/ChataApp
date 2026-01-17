@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls 2.5
 import Qt5Compat.GraphicalEffects
+import QtMultimedia
 
 Item {
     id: root
@@ -580,7 +581,8 @@ Item {
                             }
                         }
 
-                        property var modelviewWindow: null
+                        property var previewWindow: null
+                        property real lastClickTime: 0
                         MouseArea {
                             anchors.fill: parent
                             hoverEnabled: true
@@ -588,42 +590,92 @@ Item {
                             propagateComposedEvents: true
 
                             function isSupportModelFile(filePath) {
-                                var imageExtensions = ['.obj']
+                                var modelExtensions = ['.obj']
                                 var lowerPath = String(filePath).toLowerCase()
-                                return imageExtensions.some(ext => lowerPath.endsWith(ext))
+                                return modelExtensions.some(ext => lowerPath.endsWith(ext))
+                            }
+
+                            function isSupportVideoFile(filePath) {
+                                var videoExtensions = ['.mp4','.mkv','.avi']
+                                var lowerPath = String(filePath).toLowerCase()
+                                return videoExtensions.some(ext => lowerPath.endsWith(ext))
                             }
 
                             onClicked: {
                                 if (model.fileprogress<100){
+
+                                    let currentTime = new Date().getTime()
+                                    console.log(currentTime,lastClickTime,currentTime - lastClickTime)
+
                                     if(model.filestatus === 0 || model.filestatus === 3)
+                                    {
+                                        if (currentTime - lastClickTime < 500)
+                                        {
+                                            console.log("点击过快，忽略")
+                                            return
+                                        }
                                         sessionmodel.startTrans(model.fileid);
+                                    }
                                     else if (model.filestatus === 1)
+                                    {
+                                        if (currentTime - lastClickTime < 500)
+                                        {
+                                            console.log("点击过快，忽略")
+                                            return
+                                        }
                                         sessionmodel.stopTrans(model.fileid);
+                                    }
                                     else
                                         mouse.accepted = false
+
+                                    lastClickTime = currentTime
                                 }
                                 else {
                                     if(isSupportModelFile(model.filename))
                                     {
-                                        if (!messagebubble_file.modelviewWindow) {
-                                            var component = Qt.createComponent(
+                                        if (!messagebubble_file.previewWindow) {
+                                            let component = Qt.createComponent(
                                                         "3DModelViewer.qml")
                                             if (component.status === Component.Ready) {
-                                                var win = component.createObject(
+                                                let win = component.createObject(
                                                             root, {
                                                                 "filepath": model.filepath
                                                             })
-                                                messagebubble_file.modelviewWindow = win
-                                                messagebubble_file.modelviewWindow.onClosing.connect(
+                                                messagebubble_file.previewWindow = win
+                                                messagebubble_file.previewWindow.onClosing.connect(
                                                             function () {
-                                                                messagebubble_file.modelviewWindow.destroy()
-                                                                messagebubble_file.modelviewWindow = null
+                                                                messagebubble_file.previewWindow.destroy()
+                                                                messagebubble_file.previewWindow = null
                                                             })
-                                                messagebubble_file.modelviewWindow.show()
+                                                messagebubble_file.previewWindow.show()
                                             }
                                         } else {
                                             // 如果窗口已存在，则激活它
-                                            messagebubble_file.modelviewWindow.requestActivate()
+                                            messagebubble_file.previewWindow.requestActivate()
+                                        }
+                                    }
+                                    else if(isSupportVideoFile(model.filename))
+                                    {
+                                        if (!messagebubble_file.previewWindow) {
+                                            let component = Qt.createComponent(
+                                                        "videoPreviewWindow.qml")
+                                            if (component.status === Component.Ready) {
+                                                let win = component.createObject(
+                                                            root, {
+                                                                "videoSource": model.filepath,
+                                                                "fileid": model.fileid
+                                                            })
+                                                messagebubble_file.previewWindow = win
+                                                messagebubble_file.previewWindow.onClosing.connect(
+                                                            function () {
+                                                                messagebubble_file.previewWindow.destroy()
+                                                                messagebubble_file.previewWindow = null
+                                                            })
+                                                messagebubble_file.previewWindow.show()
+                                            }
+                                        } else {
+                                            // 如果窗口已存在，则激活它
+                                            messagebubble_file.previewWindow.requestActivate()
                                         }
                                     }
                                     else {

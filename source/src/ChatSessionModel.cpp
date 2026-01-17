@@ -9,6 +9,7 @@
 #include <QBuffer>
 #include <QFileInfo>
 #include <QDir>
+#include <QTimer>
 
 QString generateThumbnailBase64(const QString& imagePath,
                                 int maxWidth = 320,
@@ -350,11 +351,29 @@ void ChatSessionModel::startTrans(const QString& fileid)
 		{
 			if (USERINFOMODEL->isMyToken(chatmsg.srctoken))
 			{
-				FILETRANSMANAGER->ReqUploadFile(chatmsg.fileid);
+                CHATITEMMODEL->fileTransProgressChange(fileid,0);
+
+                // FILETRANSMANAGER->ReqUploadFile(chatmsg.fileid);
+
+                QTimer* timer = new QTimer();
+                timer->setSingleShot(true);
+                QObject::connect(timer, &QTimer::timeout, [this, id = chatmsg.fileid]() {
+                    FILETRANSMANAGER->ReqUploadFile(id);
+                });
+                timer->start(300);
 			}
 			else
 			{
-				FILETRANSMANAGER->ReqDownloadFile(chatmsg.fileid);
+                CHATITEMMODEL->fileTransProgressChange(fileid,0);
+
+                // FILETRANSMANAGER->ReqDownloadFile(chatmsg.fileid);
+
+                QTimer* timer = new QTimer();
+                timer->setSingleShot(true);
+                QObject::connect(timer, &QTimer::timeout, [this, id = chatmsg.fileid]() {
+                    FILETRANSMANAGER->ReqDownloadFile(id);
+                });
+                timer->start(300);
 			}
 			return;
 		}
