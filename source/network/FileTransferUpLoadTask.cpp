@@ -1,11 +1,10 @@
 #include "FileTransferUploadTask.h"
 #include "ConnectManager.h"
 #include "NetWorkHelper.h"
-
-using namespace std;
+#include "MD5Helper.h"
 
 FileTransferUploadTask::FileTransferUploadTask(const QString& taskid, const QString& filepath)
-	: FileTransferTask(taskid, filepath)
+    : FileTransferTask(taskid, filepath, "")
 {
 	ParseFile();
 }
@@ -47,6 +46,7 @@ bool FileTransferUploadTask::ParseFile()
 	IsFileEnable = file_io.Open(file_path, FileIOHandler::OpenMode::READ_ONLY);
 	if (IsFileEnable)
 	{
+        _md5 = QString::fromStdString(MD5Helper::computeFileMD5(file_path.toStdString()));
 		file_size = file_io.GetSize();
 		suggest_chunksize = GetSuggestChunsize(file_size);
 	}
@@ -130,7 +130,7 @@ bool FileTransferUploadTask::ParseChunkMap(const json& js)
 	bool parseresult = true;
 	if (js.contains("chunk_map") && js.at("chunk_map").is_array())
 	{
-		vector<FileTransferChunkInfo> chunkmap;
+        std::vector<FileTransferChunkInfo> chunkmap;
 		json js_chunkmap = js.at("chunk_map");
 		for (auto& js_chunk : js_chunkmap)
 		{
@@ -207,7 +207,7 @@ uint32_t FileTransferUploadTask::Progress()
 
 void FileTransferUploadTask::SendNextChunkData()
 {
-	vector<FileTransferChunkInfo> untrans_chunks = getUntransferredChunks(chunk_map, file_size);
+    std::vector<FileTransferChunkInfo> untrans_chunks = getUntransferredChunks(chunk_map, file_size);
 	if (untrans_chunks.empty()) // 发送完毕
 	{
 		json js_success;
@@ -347,7 +347,7 @@ void FileTransferUploadTask::ProcessMsg(const json& js, Buffer& buf)
 {
 	if (js.contains("taskid"))
 	{
-		string taskid = js.at("taskid");
+        std::string taskid = js.at("taskid");
 		if (taskid != task_id)
 			return;
 	}

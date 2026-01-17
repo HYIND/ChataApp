@@ -30,7 +30,7 @@ uint64_t GetSuggestChunsize(uint64_t file_size);
 class FileTransferTask
 {
 public:
-	FileTransferTask(const QString& taskid, const QString& filepath);
+    FileTransferTask(const QString& taskid, const QString& filepath, const QString& md5);
 	virtual ~FileTransferTask();
 
 	const FileIOHandler& FileHandler();
@@ -57,6 +57,7 @@ protected:
 
 protected:
 	QString file_path;
+    QString _md5;
 	QString task_id;
 	FileIOHandler file_io;
 	uint64_t file_size = 0;

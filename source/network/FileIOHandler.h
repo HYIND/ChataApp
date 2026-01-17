@@ -20,6 +20,7 @@ public:
 public:
     FileIOHandler();
     explicit FileIOHandler(const QString& filepath, OpenMode mode);
+    explicit FileIOHandler(const std::string& filepath, OpenMode mode);
     virtual ~FileIOHandler();
 
     // 禁止拷贝和赋值
@@ -36,6 +37,7 @@ public:
 
     qint64 Read(char* buf, qint64 bytesToRead);
     qint64 Read(Buffer& buf, qint64 bytesToRead);
+    qint64 Read(Buffer &buffer);
     qint64 Write(const char* buf, qint64 bytesToWrite);
     qint64 Write(const Buffer& buf);
     qint64 Seek(qint64 offset = 0);

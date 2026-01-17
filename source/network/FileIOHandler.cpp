@@ -13,6 +13,12 @@ FileIOHandler::FileIOHandler(const QString& filepath, OpenMode mode)
     Open(filepath, mode);
 }
 
+FileIOHandler::FileIOHandler(const std::string &filepath, OpenMode mode)
+    : mode_(mode), offset_(0)
+{
+    Open(QString::fromStdString(filepath), mode);
+}
+
 FileIOHandler::~FileIOHandler()
 {
     Close();
@@ -26,10 +32,11 @@ bool FileIOHandler::Open(const QString& path, OpenMode mode)
     try {
         Close();
 
+        mode_ = mode;
+        offset_ = 0;
+
         file_.setFileName(path);
         if (file_.open(static_cast<QIODevice::OpenMode>(mode))) {
-            mode_ = mode;
-            offset_ = 0;
             result = true;
         } else {
             qWarning() << "Failed to open file:" << path << "Error:" << file_.errorString();
@@ -97,6 +104,7 @@ qint64 FileIOHandler::Read(char* buf, qint64 bytesToRead)
     return result;
 }
 
+
 qint64 FileIOHandler::Read(Buffer& buffer, qint64 bytesToRead)
 {
     // 确保Buffer有足够空间
@@ -104,7 +112,24 @@ qint64 FileIOHandler::Read(Buffer& buffer, qint64 bytesToRead)
     {
         buffer.ReSize(buffer.Position() + bytesToRead);
     }
-    int result = Read(buffer.Byte() + buffer.Position(), bytesToRead);
+    qint64 result = Read(buffer.Byte() + buffer.Position(), bytesToRead);
+    return result;
+}
+
+qint64 FileIOHandler::Read(Buffer &buffer)
+{
+    LockGuard guard(mutex_);
+    if (GetSize() <= 0)
+        return 0;
+
+    qint64 bytesToRead = GetSize();
+    // 确保Buffer有足够空间
+    if (buffer.Remain() < static_cast<uint64_t>(bytesToRead))
+    {
+        buffer.ReSize(buffer.Position() + bytesToRead);
+    }
+    Seek(0);
+    qint64 result = Read(buffer.Byte() + buffer.Position(), bytesToRead);
     return result;
 }
 

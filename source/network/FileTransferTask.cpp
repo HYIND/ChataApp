@@ -175,11 +175,13 @@ uint32_t CountProgress(const std::vector<FileTransferChunkInfo> &chunks, uint64_
     return progress;
 }
 
-FileTransferTask::FileTransferTask(const QString &taskid, const QString &filepath)
+FileTransferTask::FileTransferTask(const QString &taskid, const QString &filepath, const QString &md5)
 {
     file_path = filepath;
+    _md5 = md5;
     task_id = taskid;
 }
+
 FileTransferTask::~FileTransferTask()
 {
     file_io.Close();

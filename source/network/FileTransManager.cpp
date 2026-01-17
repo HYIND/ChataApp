@@ -95,7 +95,8 @@ void FileTransManager::AckTaskRes(const json& js)
 
 	if (result == -1)
 	{
-		return;
+        CHATITEMMODEL->fileTransError(fileid);
+        return;
 	}
 
 	if (type == 1)
@@ -127,7 +128,7 @@ void FileTransManager::AckTaskRes(const json& js)
 			if (result == 1)
 			{
 				//防止重复添加同一文件的任务
-				if (!AddDownloadTask(fileid, taskid, re->filepath, re->filesize, re->md5))
+                if (!AddDownloadTask(fileid, taskid, re->filepath, re->md5, re->filesize))
 				{
 					json js_error;
 					js_error["command"] = 7080;
@@ -191,7 +192,7 @@ bool FileTransManager::AddUploadTask(const QString& fileid, const QString& taski
 	return result;
 }
 
-bool FileTransManager::AddDownloadTask(const QString& fileid, const QString& taskid, const QString& filepath, uint64_t filesize, const QString& md5)
+bool FileTransManager::AddDownloadTask(const QString& fileid, const QString& taskid, const QString& filepath, const QString& md5, uint64_t filesize)
 {
 	FileTransTaskContent* content = nullptr;
 	if (FindTaskByFileId(fileid, content))
@@ -200,7 +201,7 @@ bool FileTransManager::AddDownloadTask(const QString& fileid, const QString& tas
 		return false;
 
 	FileTransferDownLoadTask* downloadtask = new FileTransferDownLoadTask(taskid);
-	downloadtask->RegisterTransInfo(filepath, filesize);
+    downloadtask->RegisterTransInfo(filepath, md5, filesize);
 	downloadtask->BindErrorCallBack(std::bind(&FileTransManager::OnDownloadError, this, std::placeholders::_1));
 	downloadtask->BindFinishedCallBack(std::bind(&FileTransManager::OnDownloadFinish, this, std::placeholders::_1));
 	downloadtask->BindInterruptedCallBack(std::bind(&FileTransManager::OnDownloadInterrupt, this, std::placeholders::_1));

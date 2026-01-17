@@ -1,8 +1,7 @@
 #include "FileTransferDownLoadTask.h"
 #include "ConnectManager.h"
 #include "NetWorkHelper.h"
-
-using namespace std;
+#include "MD5Helper.h"
 
 void displayTransferProgress(uint64_t totalSize, const std::vector<FileTransferChunkInfo>& transferredChunks, int barWidth = 160)
 {
@@ -19,7 +18,7 @@ void displayTransferProgress(uint64_t totalSize, const std::vector<FileTransferC
 		{
 			if (sorted[i].range_left <= merged.back().range_right + 1)
 			{
-				merged.back().range_right = max(merged.back().range_right, sorted[i].range_right);
+                merged.back().range_right = std::max(merged.back().range_right, sorted[i].range_right);
 			}
 			else
 			{
@@ -87,42 +86,8 @@ QString getChunkFilePath(const QString& filepath)
 	return filepath + "__chunks";
 }
 
-bool ExtractBinaryJson(json jsbinary, std::vector<uint8_t>& v)
-{
-	bool result = false;
-	if (jsbinary.is_object() && jsbinary.contains("bytes"))
-	{
-		const auto& bytes_field = jsbinary["bytes"];
-		if (bytes_field.is_array())
-		{
-			try
-			{
-				const size_t size = bytes_field.size();
-				v.reserve(v.size() + size); // 预分配空间
-
-				for (const auto& item : bytes_field)
-				{
-					if (!item.is_number())
-					{
-						v.clear();
-						return false;
-					}
-					v.push_back(static_cast<uint8_t>(item.get<int>()));
-				}
-				result = true;
-			}
-			catch (const json::exception& e)
-			{
-				cout << "error when ExtractBinaryJson: " + std::string(e.what()) << endl;
-				result = false;
-			}
-		}
-	}
-	return result;
-}
-
-FileTransferDownLoadTask::FileTransferDownLoadTask(const QString& taskid, const QString& filepath_dir)
-	: FileTransferTask(taskid, filepath_dir)
+FileTransferDownLoadTask::FileTransferDownLoadTask(const QString& taskid, const QString& filepath, const QString& md5)
+    : FileTransferTask(taskid, filepath, md5)
 {
 }
 
@@ -196,7 +161,7 @@ bool FileTransferDownLoadTask::ParseChunkMap(const json& js)
 	bool parseresult = true;
 	if (js.contains("chunk_map") && js.at("chunk_map").is_array())
 	{
-		vector<FileTransferChunkInfo> chunkmap;
+        std::vector<FileTransferChunkInfo> chunkmap;
 		json js_chunkmap = js.at("chunk_map");
 		for (auto& js_chunk : js_chunkmap)
 		{
@@ -244,7 +209,7 @@ bool FileTransferDownLoadTask::ReadChunkFile()
 		Buffer buf;
 		chunkfile_io.Seek();
 		chunkfile_io.Read(buf, chunkfile_io.GetSize());
-		string js_str(buf.Byte(), buf.Length());
+        std::string js_str(buf.Byte(), buf.Length());
 		json js;
 		try
 		{
@@ -267,7 +232,7 @@ bool FileTransferDownLoadTask::ParseFile()
 	return IsFileEnable;
 }
 
-bool FileTransferDownLoadTask::CheckFinish()
+bool FileTransferDownLoadTask::CheckTransFinish()
 {
 	return getUntransferredChunks(chunk_map, file_size).empty();
 }
@@ -366,7 +331,7 @@ void FileTransferDownLoadTask::AckTransReq(const json& js)
 	if (js.contains("filesize") && js.at("filesize").is_number_unsigned() && js.contains("filename") && js.at("filename").is_string())
 	{
 		uint64_t filesize = js.at("filesize");
-		string filename = js.at("filename");
+        std::string filename = js.at("filename");
 
 		ackresult = ((file_size == filesize) /* && (getFilenameFromPath(file_path) == filename) */);
 	}
@@ -438,22 +403,6 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 	chunkdata.range_left = js.at("range").at(0);
 	chunkdata.range_right = js.at("range").at(1);
 
-	//vector<uint8_t> bytes;
-	//error = !ExtractBinaryJson(js["data"], bytes);
-	//if (error)
-	//{
-	//	OccurError();
-	//	return;
-	//}
-	//chunkdata.FromBinary(bytes);
-
-	//if (chunkdata.buf.Length() < chunksize)
-	//{
-	//	error = true;
-	//	OccurError();
-	//	return;
-	//}
-
     if (buf.Remain() < chunksize)
 	{
 		error = true;
@@ -501,14 +450,21 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 	}
 
 	json js_reply;
-	bool finished = CheckFinish();
+    bool finished = CheckTransFinish();
 	if (finished)
 	{
 		file_io.Truncate(file_size);
-
-		js_reply["command"] = 8010;
-		js_reply["taskid"] = task_id.toStdString();
-		js_reply["result"] = 1;
+        if (!MD5Helper::verifyFileMD5(file_path.toStdString(), _md5.toStdString()))
+        {
+            OccurError();
+            return;
+        }
+        else
+        {
+            js_reply["command"] = 8010;
+            js_reply["taskid"] = task_id.toStdString();
+            js_reply["result"] = 1;
+        }
 	}
 	else
 	{
@@ -550,20 +506,28 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 
 void FileTransferDownLoadTask::AckRecvFinished(const json& js)
 {
-	if (CheckFinish())
+    if (CheckTransFinish())
 	{
-		file_io.Truncate(file_size);
-		OccurFinish();
+        if (!IsFileEnable)
+            IsFileEnable = file_io.Open(file_path, FileIOHandler::OpenMode::READ_WRITE);
+        if (IsFileEnable)
+            file_io.Truncate(file_size);
 	}
 
 	if (IsFinished)
 	{
-		json js_reply;
-		js_reply["command"] = 8010;
-		js_reply["taskid"] = task_id.toStdString();
-		js_reply["result"] = IsFinished ? 1 : 0;
+        if (!MD5Helper::verifyFileMD5(file_path.toStdString(), _md5.toStdString()))
+            OccurError();
+        else
+        {
+            json js_reply;
+            js_reply["command"] = 8010;
+            js_reply["taskid"] = task_id.toStdString();
+            js_reply["result"] = IsFinished ? 1 : 0;
 
-		NetWorkHelper::SendMessagePackage(&js_reply);
+            NetWorkHelper::SendMessagePackage(&js_reply);
+            OccurFinish();
+        }
 	}
 	else
 	{
@@ -653,7 +617,7 @@ void FileTransferDownLoadTask::ProcessMsg(const json& js, Buffer& buf)
 {
 	if (js.contains("taskid"))
 	{
-		string taskid = js.at("taskid");
+        std::string taskid = js.at("taskid");
 		if (taskid != task_id)
 			return;
 	}
@@ -735,9 +699,10 @@ void FileTransferDownLoadTask::BindProgressCallBack(std::function<void(FileTrans
 	_callbackProgress = callback;
 }
 
-void FileTransferDownLoadTask::RegisterTransInfo(const QString& filepath, uint64_t filesize)
+void FileTransferDownLoadTask::RegisterTransInfo(const QString& filepath, const QString& md5, uint64_t filesize)
 {
 	file_path = filepath;
+    _md5 = md5;
 	file_size = filesize;
 	IsRegister = true;
 }

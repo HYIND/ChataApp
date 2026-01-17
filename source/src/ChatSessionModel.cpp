@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QTimer>
+#include "MD5Helper.h"
 
 QString generateThumbnailBase64(const QString& imagePath,
                                 int maxWidth = 320,
@@ -276,9 +277,9 @@ void ChatSessionModel::fileTransError(const QString& fileid)
 {
 	for (int index = 0; index < m_messages.size(); index++)
 	{
-		if (m_messages[index].type != MsgType::file)
+        if (m_messages[index].type != MsgType::file && m_messages[index].type != MsgType::picture)
 			continue;
-        if (m_messages[index].fileid == fileid && m_messages[index].type != MsgType::picture)
+        if (m_messages[index].fileid == fileid)
 		{
 			m_messages[index].fileprogress = 0;
 			m_messages[index].filestatus = FileStatus::Fail;
@@ -305,7 +306,7 @@ void ChatSessionModel::sendPicture(const QString& goaltoken, const QString& url)
     QString filepath = url;
     QString filename = getFilenameFromPath(file.fileName());
     QString fileid = QUuid::createUuid().toString();
-    QString md5 = "";
+    QString md5 = QString::fromStdString(MD5Helper::computeFileMD5(filepath.toStdString()));
     qint64 filesize = file.size();
 
 	file.close();
@@ -329,7 +330,7 @@ void ChatSessionModel::sendFile(const QString& goaltoken, const QString& url)
 	QString filepath = url;
 	QString filename = getFilenameFromPath(file.fileName());
 	QString fileid = QUuid::createUuid().toString();
-	QString md5 = "";
+    QString md5 =  QString::fromStdString(MD5Helper::computeFileMD5(filepath.toStdString()));
 	qint64 filesize = file.size();
 
     file.close();

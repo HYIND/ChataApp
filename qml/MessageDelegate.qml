@@ -605,13 +605,13 @@ Item {
                                 if (model.fileprogress<100){
 
                                     let currentTime = new Date().getTime()
-                                    console.log(currentTime,lastClickTime,currentTime - lastClickTime)
+                                    // console.log(currentTime,lastClickTime,currentTime - lastClickTime)
 
                                     if(model.filestatus === 0 || model.filestatus === 3)
                                     {
                                         if (currentTime - lastClickTime < 500)
                                         {
-                                            console.log("点击过快，忽略")
+                                            // console.log("点击过快，忽略")
                                             return
                                         }
                                         sessionmodel.startTrans(model.fileid);
@@ -620,7 +620,7 @@ Item {
                                     {
                                         if (currentTime - lastClickTime < 500)
                                         {
-                                            console.log("点击过快，忽略")
+                                            // console.log("点击过快，忽略")
                                             return
                                         }
                                         sessionmodel.stopTrans(model.fileid);
