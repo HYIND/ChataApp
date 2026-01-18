@@ -16,6 +16,9 @@ Window {
     property point dragStart: Qt.point(0, 0)
     property bool dragging: false
 
+    property int imgwidth: 0
+    property int imgheight: 0
+
     // 窗口设置
     width: Math.max(controlBar.width ,imageDisplayLoader.width)
     height: controlBar.height + imageDisplayLoader.height
@@ -67,6 +70,16 @@ Window {
 
     function toggleOCR() {
         ocrEnabled = !ocrEnabled;
+    }
+
+    onImgwidthChanged: {
+        // console.log("onImgwidthChanged",imgwidth);
+        ocrOverlay.width = imgwidth;
+    }
+
+    onImgheightChanged: {
+        // console.log("onImgheightChanged",imgheight);
+        ocrOverlay.height = imgheight;
     }
 
     Connections
@@ -220,117 +233,123 @@ Window {
                 }
             }
 
-            Repeater {
-                model: ocrResults
+            Item
+            {
+                id:ocrOverlay
+                anchors.centerIn : parent
+                z:100
 
-                delegate: Rectangle {
-                    // 透明背景，只用于定位
-                    color: "transparent"
+                Repeater {
+                    model: ocrResults
 
-                    // 根据OCR结果定位
-                    x: modelData.x
-                    y: modelData.y
-                    z: 100
+                    delegate: Rectangle {
+                        // 透明背景，只用于定位
+                        color: "transparent"
 
-                    visible: ocrEnabled
+                        // 根据OCR结果定位
+                        x: modelData.x
+                        y: modelData.y
 
-                    // 文字区域标注
-                    Rectangle {
-                        id: textBg
-                        width: modelData.width
-                        height: modelData.height
+                        visible: ocrEnabled
 
-                        color: Qt.rgba(1, 0, 0, 0.2)  // 半透明红色背景
-                        radius: 3
-                    }
+                        // 文字区域标注
+                        Rectangle {
+                            id: textBg
+                            width: modelData.width
+                            height: modelData.height
 
-                    // 文字标签
-                    TextArea {
-                        id: textLabel
-                        text: modelData.text
-
-                        font.bold: true
-                        font.pixelSize: 14
-
-                        clip: false
-                        background: Rectangle {
-                            color: "transparent"
+                            color: Qt.rgba(1, 0, 0, 0.2)  // 半透明红色背景
+                            radius: 3
                         }
 
-                        color: "#FFFF00"
-                        wrapMode: Text.NoWrap
+                        // 文字标签
+                        TextArea {
+                            id: textLabel
+                            text: modelData.text
 
-                        readOnly: true
-                        selectByMouse: true
+                            font.bold: true
+                            font.pixelSize: 14
 
-                        height: implicitHeight
+                            clip: false
+                            background: Rectangle {
+                                color: "transparent"
+                            }
+
+                            color: "#FFFF00"
+                            wrapMode: Text.NoWrap
+
+                            readOnly: true
+                            selectByMouse: true
+
+                            height: implicitHeight
+                        }
+
+
+                        // 置信度指示器
+                        // Rectangle {
+                        //     anchors.top: textBg.bottom
+                        //     anchors.topMargin: 2
+                        //     width: textBg.width
+                        //     height: 5
+                        //     color: "lightgray"
+
+                        //     Rectangle {
+                        //         width: parent.width * (modelData.conf / 100)
+                        //         height: parent.height
+                        //         color: modelData.conf > 90 ? "green" :
+                        //                modelData.conf > 80 ? "orange" : "red"
+                        //     }
+
+                        //     Text {
+                        //         anchors.centerIn: parent
+                        //         text: modelData.conf + "%"
+                        //         color: "white"
+                        //         font.pixelSize: 10
+                        //     }
+                        // }
                     }
-
-
-                    // 置信度指示器
-                    // Rectangle {
-                    //     anchors.top: textBg.bottom
-                    //     anchors.topMargin: 2
-                    //     width: textBg.width
-                    //     height: 5
-                    //     color: "lightgray"
-
-                    //     Rectangle {
-                    //         width: parent.width * (modelData.conf / 100)
-                    //         height: parent.height
-                    //         color: modelData.conf > 90 ? "green" :
-                    //                modelData.conf > 80 ? "orange" : "red"
-                    //     }
-
-                    //     Text {
-                    //         anchors.centerIn: parent
-                    //         text: modelData.conf + "%"
-                    //         color: "white"
-                    //         font.pixelSize: 10
-                    //     }
-                    // }
                 }
-            }
 
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton
 
-                propagateComposedEvents: true
+                    propagateComposedEvents: true
 
-                onClicked: function(mouse){
-                    mouse.accepted = false;
-                }
-                onDoubleClicked: function(mouse){
-                    if(!canclose || dragging) {
+                    onClicked: function(mouse){
                         mouse.accepted = false;
                     }
-                    else
-                    {
-                        imagePreviewWindow.close()
-                        imagePreviewWindow.destroy()
+                    onDoubleClicked: function(mouse){
+                        if(!canclose || dragging) {
+                            mouse.accepted = false;
+                        }
+                        else
+                        {
+                            imagePreviewWindow.close()
+                            imagePreviewWindow.destroy()
+                        }
+                    }
+                    onPressed: function(mouse) {
+                        dragStart = Qt.point(mouse.x, mouse.y);
+                    }
+                    onPositionChanged: function(mouse) {
+                        dragging = true;
+                        if (dragging) {
+                            imagePreviewWindow.x += mouse.x - dragStart.x;
+                            imagePreviewWindow.y += mouse.y - dragStart.y;
+                        }
+                    }
+                    onReleased: {
+                        dragging = false;
                     }
                 }
-                onPressed: function(mouse) {
-                    dragStart = Qt.point(mouse.x, mouse.y);
-                }
-                onPositionChanged: function(mouse) {
-                    dragging = true;
-                    if (dragging) {
-                        imagePreviewWindow.x += mouse.x - dragStart.x;
-                        imagePreviewWindow.y += mouse.y - dragStart.y;
-                    }
-                }
-                onReleased: {
-                    dragging = false;
-                }
-
             }
         }
     }
 
     Component {
         id: imageComponent
+
         Item
         {
             width: Math.max(innerImage.width,200)
@@ -388,6 +407,12 @@ Window {
                     } else if (status === Image.Error) {
                         console.error("图片加载失败:", source);
                     }
+                }
+                onWidthChanged: {
+                    imgwidth = width;
+                }
+                onHeightChanged: {
+                    imgheight = height;
                 }
             }
         }
@@ -447,6 +472,13 @@ Window {
                 anchors.centerIn: parent
                 fillMode: Image.PreserveAspectFit
                 source: processImagePath(imageSource)
+
+                onWidthChanged: {
+                    imgwidth = width;
+                }
+                onHeightChanged: {
+                    imgheight = height;
+                }
             }
         }
     }
