@@ -44,6 +44,9 @@ Window {
             currentIndex = 0
             popup.open()
         }
+        function ondisConnect() {
+            popup.open()
+        }
     }
 
     Popup {
@@ -67,7 +70,7 @@ Window {
                     width: 70
                     height: 30
                     Text {
-                        text: "连接服务器失败！"
+                        text: currentIndex == 0 ? "连接服务器失败！" : "与服务器断开连接！"
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.verticalCenter: parent.verticalCenter
                         font.pixelSize: 18

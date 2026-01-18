@@ -11,3 +11,8 @@ void LoginModel::LoginFail()
 {
     emit loginFail();
 }
+
+void LoginModel::DisConnect()
+{
+    emit disConnect();
+}

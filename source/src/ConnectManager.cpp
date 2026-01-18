@@ -1,5 +1,6 @@
 #include "ConnectManager.h"
 #include "MsgManager.h"
+#include "ModelManager.h"
 
 ConnectManager *ConnectManager::Instance()
 {
@@ -106,6 +107,7 @@ void ConnectManager::slots_Send(const QByteArray &buf)
 void ConnectManager::slots_PeerClose()
 {
     status = ConnectStatus::disconnect;
+    LOGINMODEL->DisConnect();
 }
 
 void ConnectManager::slots_RecvMessage(QByteArray& recv)

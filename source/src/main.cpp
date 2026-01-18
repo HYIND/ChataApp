@@ -73,7 +73,15 @@ int main(int argc, char *argv[])
 
     CONNECTMANAGER->Login("192.168.58.130",8888);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    int trycount = 0;
+    while(trycount < 10)
+    {
+        auto status = CONNECTMANAGER->connectStatus();
+        if (status == ConnectStatus::connected || status == ConnectStatus::disconnect)
+            break;
+        trycount++;
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
 
     if (CONNECTMANAGER->connectStatus() == ConnectStatus::connected)
     {

@@ -10,10 +10,12 @@ public:
     LoginModel();
     void LoginSuccess();
     void LoginFail();
+    void DisConnect();
 
 signals:
     void loginSuccess();
     void loginFail();
+    void disConnect();
 };
 
 #endif // LOGINMODEL_H
