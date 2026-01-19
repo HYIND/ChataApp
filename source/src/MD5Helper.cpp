@@ -190,21 +190,14 @@ namespace MD5Calculate
     }
 }
 
-struct MD5Context
+MD5Context::MD5Context()
 {
-    unsigned int status[4];
-    unsigned long long count; // 已处理的字节数
-    Buffer cacheBuffer;       // 缓存中的数据长度
-
-    MD5Context()
-    {
-        status[0] = 0x67452301;
-        status[1] = 0xefcdab89;
-        status[2] = 0x98badcfe;
-        status[3] = 0x10325476;
-        count = 0;
-    }
-};
+    status[0] = 0x67452301;
+    status[1] = 0xefcdab89;
+    status[2] = 0x98badcfe;
+    status[3] = 0x10325476;
+    count = 0;
+}
 
 std::string MD5Helper::computeMD5(const char *data, size_t length)
 {
@@ -320,3 +313,4 @@ std::string MD5Helper::MD5Ctx_Final(std::shared_ptr<MD5Context> ctx)
 
     return MD5Calculate::toHexString(reinterpret_cast<unsigned char *>(ctx->status));
 }
+
