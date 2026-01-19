@@ -164,12 +164,7 @@ bool FileTransManager::AddUploadTask(const string &fileid, const string &taskid,
         SAFE_DELETE(content);
 
     if (result)
-        result = uploadtask->StartSendFile(session);
-    if (!result)
-    {
-        m_tasks.Erase(taskid);
-        SAFE_DELETE(content);
-    }
+        result = uploadtask->StartSendFile(session); // 如果返回false，task自动触发错误，无需额外处理
 
     return result;
 }

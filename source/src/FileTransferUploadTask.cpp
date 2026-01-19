@@ -355,10 +355,13 @@ void FileTransferUploadTask::OnProgress(uint32_t progress)
 
 bool FileTransferUploadTask::StartSendFile(BaseNetWorkSession *session)
 {
-    if (IsFileEnable)
+    bool result = IsFileEnable;
+    if (result)
         SendTransReq(session);
+    else
+        OccurError(session);
 
-    return IsFileEnable;
+    return result;
 }
 
 void FileTransferUploadTask::ProcessMsg(BaseNetWorkSession *session, const json &js, Buffer &buf)
