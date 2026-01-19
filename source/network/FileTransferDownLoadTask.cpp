@@ -67,8 +67,8 @@ void displayTransferProgress(uint64_t totalSize, const std::vector<FileTransferC
 		}
 	}
 
-	bool flushenable = false;
-	if (flushenable)
+    bool flushenable = true;
+    if (flushenable)
 	{
 		std::cout << "] " << static_cast<int>(percent) << "%\r";
 		std::cout.flush();
@@ -84,6 +84,16 @@ void displayTransferProgress(uint64_t totalSize, const std::vector<FileTransferC
 QString getChunkFilePath(const QString& filepath)
 {
 	return filepath + "__chunks";
+}
+
+QString getMD5CheckPointFilePath(const QString& filepath)
+{
+    return filepath + "__check";
+}
+
+MD5CheckPoint::MD5CheckPoint()
+{
+    progress = 0;
 }
 
 FileTransferDownLoadTask::FileTransferDownLoadTask(const QString& taskid, const QString& filepath, const QString& md5)
@@ -121,6 +131,75 @@ void FileTransferDownLoadTask::InterruptTrans()
 	}
 
 	InterruptedLock.Leave();
+}
+
+
+void FileTransferDownLoadTask::WriteToMD5CheckFile()
+{
+    uint32_t curprogress = Progress();
+    uint32_t lastcheckprogress = _MD5CheckPoint.progress;
+    if (curprogress - lastcheckprogress < 20)
+        return;
+    else
+    {
+        json js_checkfile;
+        {
+            json js_md5checkpoint;
+            {
+                json js_md5state;
+                std::shared_ptr<MD5SnapShot> shot = std::make_shared<MD5SnapShot>(_asyncmd5.SnapShot());
+                js_md5state["status0"] = shot->status[0];
+                js_md5state["status1"] = shot->status[1];
+                js_md5state["status2"] = shot->status[2];
+                js_md5state["status3"] = shot->status[3];
+                js_md5state["count"] = shot->count;
+
+                {
+                    json cache;
+                    {
+                        json data_array = json::array();
+
+                        uint8_t *ptr = (uint8_t *)(shot->cacheBuffer.Data());
+                        uint64_t length = shot->cacheBuffer.Length();
+                        for (uint64_t i = 0; i < length; i++)
+                            data_array.push_back(ptr[i]);
+
+                        cache["data"] = data_array;
+                        cache["size"] = length;
+                    }
+                    js_md5state["cache"] = cache;
+                }
+
+                js_md5state["isfinish"] = shot->isfinish;
+                js_md5state["md5string"] = shot->md5string;
+
+                _MD5CheckPoint.progress = curprogress;
+                _MD5CheckPoint.snap = shot;
+
+                js_md5checkpoint["md5state"] = js_md5state;
+                js_md5checkpoint["checkprogress"] = curprogress;
+            }
+            js_checkfile["md5checkpoint"] = js_md5checkpoint;
+        }
+
+        Buffer buf(js_checkfile.dump());
+
+        QString CheckPointFilePath = getMD5CheckPointFilePath(file_path);
+        FileIOHandler md5checkfile_io(CheckPointFilePath, FileIOHandler::OpenMode::WRITE_ONLY);
+
+        md5checkfile_io.Seek(0);
+        long writecount = md5checkfile_io.Write(buf);
+        if (writecount != buf.Length())
+        {
+            FileIOHandler::Remove(CheckPointFilePath);
+            return;
+        }
+
+        if (md5checkfile_io.GetSize() > buf.Length())
+            md5checkfile_io.Truncate(buf.Length());
+
+        return;
+    }
 }
 
 bool FileTransferDownLoadTask::WriteToChunkFile()
@@ -193,7 +272,89 @@ bool FileTransferDownLoadTask::ParseChunkMap(const json& js)
 			chunk_map = mergeChunks(chunkmap);
 		}
 	}
+    else
+        parseresult = false;
+
 	return parseresult;
+}
+
+bool FileTransferDownLoadTask::ParseMd5CheckPoint(const json &js)
+{
+    bool success = true;
+    if (js.contains("md5checkpoint") && js.at("md5checkpoint").is_object())
+    {
+        json js_md5checkpoint = js["md5checkpoint"];
+        if (js_md5checkpoint.contains("md5state") && js_md5checkpoint.at("md5state").is_object() &&
+            js_md5checkpoint.contains("checkprogress") && js_md5checkpoint.at("checkprogress").is_number_unsigned())
+        {
+            std::shared_ptr<MD5SnapShot> shot = std::make_shared<MD5SnapShot>();
+            auto js_md5state = js_md5checkpoint["md5state"];
+            uint32_t progress = js_md5checkpoint["checkprogress"];
+
+            static std::vector<std::string> status_list{"status0", "status1", "status2", "status3"};
+
+            if (success)
+            {
+                for (int i = 0; i < status_list.size(); i++)
+                {
+                    if (js_md5state.contains(status_list[i]) && js_md5state.at(status_list[i]).is_number_unsigned())
+                        shot->status[i] = js_md5state[status_list[i]];
+                    else
+                    {
+                        success = false;
+                        break;
+                    }
+                }
+            }
+            if (success)
+            {
+                if (js_md5state.contains("count") && js_md5state.at("count").is_number_unsigned())
+                    shot->count = js_md5state["count"];
+                else
+                    success = false;
+            }
+            if (success)
+            {
+                if (js_md5state.contains("cache") && js_md5state.at("cache").is_object())
+                {
+                    json js_cache = js_md5state["cache"];
+                    if (js_cache.contains("data") && js_cache.at("data").is_array() && js_cache.contains("size") && js_cache.at("size").is_number_unsigned())
+                    {
+                        json js_data = js_cache["data"];
+                        uint64_t size = js_cache["size"];
+                        std::vector<uint8_t> data = js_data.get<std::vector<uint8_t>>();
+                        if (size == data.size())
+                            shot->cacheBuffer.Write(data.data(), data.size());
+                        else
+                            success = false;
+                    }
+                    else
+                        success = false;
+                }
+                else
+                    success = false;
+            }
+            if (success)
+            {
+                if (js_md5state.contains("isfinish") && js_md5state.at("isfinish").is_boolean())
+                    shot->isfinish = js_md5state["isfinish"];
+                else
+                    success = false;
+            }
+            if (success)
+            {
+                _asyncmd5.LoadSnapShot(*shot);
+                _MD5CheckPoint.progress = progress;
+                _MD5CheckPoint.snap = shot;
+            }
+        }
+        else
+            success = false;
+    }
+    else
+        success = false;
+
+    return success;
 }
 
 bool FileTransferDownLoadTask::ReadChunkFile()
@@ -201,10 +362,10 @@ bool FileTransferDownLoadTask::ReadChunkFile()
 	chunk_map.clear();
 	QString ChunkFilePath = getChunkFilePath(file_path);
 
-	bool hasexist = FileIOHandler::Exists(ChunkFilePath);
+    bool exist = FileIOHandler::Exists(ChunkFilePath);
 
 	IsChunkFileEnable = chunkfile_io.Open(ChunkFilePath, FileIOHandler::OpenMode::READ_WRITE);
-	if (hasexist && IsChunkFileEnable)
+    if (exist && IsChunkFileEnable)
 	{
 		Buffer buf;
 		chunkfile_io.Seek();
@@ -224,12 +385,44 @@ bool FileTransferDownLoadTask::ReadChunkFile()
 	return IsChunkFileEnable;
 }
 
+
+bool FileTransferDownLoadTask::ReadMD5ChcekPointFile()
+{
+    QString CheckPointFilePath = getMD5CheckPointFilePath(file_path);
+
+    bool exist = FileIOHandler::Exists(CheckPointFilePath);
+    if (!exist)
+        return false;
+
+    FileIOHandler md5checkfile_io(CheckPointFilePath, FileIOHandler::OpenMode::READ_ONLY);
+    bool isopen = md5checkfile_io.IsOpen();
+    if (isopen)
+    {
+        Buffer buf;
+        md5checkfile_io.Seek(0);
+        md5checkfile_io.Read(buf, md5checkfile_io.GetSize());
+        md5checkfile_io.Close();
+        std::string js_str(buf.Byte(), buf.Length());
+        json js;
+        try
+        {
+            js = json::parse(js_str);
+        }
+        catch (...)
+        {
+        }
+        ParseMd5CheckPoint(js);
+    }
+    return isopen;
+}
+
 bool FileTransferDownLoadTask::ParseFile()
 {
 	ReleaseSource();
 	IsFileEnable = file_io.Open(file_path, FileIOHandler::OpenMode::READ_WRITE);
 	ReadChunkFile();
-	return IsFileEnable;
+    ReadMD5ChcekPointFile();
+    return IsFileEnable && IsChunkFileEnable;
 }
 
 bool FileTransferDownLoadTask::CheckTransFinish()
@@ -487,9 +680,8 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 	}
 
 	if (IsChunkFileEnable)
-	{
 		WriteToChunkFile();
-	}
+    WriteToMD5CheckFile();
 
 	json js_reply;
     bool finished = CheckTransFinish();
@@ -548,7 +740,8 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 
 void FileTransferDownLoadTask::AckRecvFinished(const json& js)
 {
-    if (CheckTransFinish())
+    IsFinished = CheckTransFinish();
+    if (IsFinished)
 	{
         if (!IsFileEnable)
             IsFileEnable = file_io.Open(file_path, FileIOHandler::OpenMode::READ_WRITE);
@@ -559,7 +752,10 @@ void FileTransferDownLoadTask::AckRecvFinished(const json& js)
 	if (IsFinished)
 	{
         if (_md5 != QString::fromStdString(AsyncMD5Final()))
+        {
             OccurError();
+            return;
+        }
         else
         {
             json js_reply;
@@ -568,13 +764,13 @@ void FileTransferDownLoadTask::AckRecvFinished(const json& js)
             js_reply["result"] = IsFinished ? 1 : 0;
 
             NetWorkHelper::SendMessagePackage(&js_reply);
-            OccurFinish();
         }
 	}
+
+    if (IsFinished)
+        OccurFinish();
 	else
-	{
 		OccurError();
-	}
 }
 
 void FileTransferDownLoadTask::SendErrorInfo()
@@ -606,8 +802,16 @@ void FileTransferDownLoadTask::OnError()
 {
 	try
 	{
-		ReleaseSource();
-		FileIOHandler::Remove(chunkfile_io.FilePath());
+        auto file_path = file_io.FilePath();
+        auto chunkfile_path = chunkfile_io.FilePath();
+        auto checkpoint_path = getMD5CheckPointFilePath(file_path);
+        ReleaseSource();
+        if (FileIOHandler::Exists(file_path))
+            FileIOHandler::Remove(file_path);
+        if (FileIOHandler::Exists(chunkfile_path))
+            FileIOHandler::Remove(chunkfile_path);
+        if (FileIOHandler::Exists(checkpoint_path))
+            FileIOHandler::Remove(checkpoint_path);
 		if (_callbackError)
 			_callbackError(this);
 	}
@@ -620,8 +824,13 @@ void FileTransferDownLoadTask::OnFinished()
 {
 	try
 	{
-		ReleaseSource();
-		FileIOHandler::Remove(chunkfile_io.FilePath());
+        auto chunkfile_path = chunkfile_io.FilePath();
+        auto checkpoint_path = getMD5CheckPointFilePath(file_path);
+        ReleaseSource();
+        if (FileIOHandler::Exists(chunkfile_path))
+            FileIOHandler::Remove(chunkfile_path);
+        if (FileIOHandler::Exists(checkpoint_path))
+            FileIOHandler::Remove(checkpoint_path);
 		if (_callbackFinieshed)
 			_callbackFinieshed(this);
 	}

@@ -5,7 +5,15 @@
 #include <cstdint>
 #include "Buffer.h"
 
-struct MD5Context;
+struct MD5Context
+{
+    unsigned int status[4];
+    unsigned long long count; // 已处理的字节数
+    Buffer cacheBuffer;       // 缓存中的数据长度
+
+    MD5Context();
+};
+
 
 class MD5Helper
 {

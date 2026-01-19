@@ -190,21 +190,15 @@ std::string computeMD5String(const unsigned char *data, size_t length)
 }
 }
 
-struct MD5Context
+MD5Context::MD5Context()
 {
-    unsigned int status[4];
-    unsigned long long count; // 已处理的字节数
-    Buffer cacheBuffer;       // 缓存中的数据长度
+    status[0] = 0x67452301;
+    status[1] = 0xefcdab89;
+    status[2] = 0x98badcfe;
+    status[3] = 0x10325476;
+    count = 0;
+}
 
-    MD5Context()
-    {
-        status[0] = 0x67452301;
-        status[1] = 0xefcdab89;
-        status[2] = 0x98badcfe;
-        status[3] = 0x10325476;
-        count = 0;
-    }
-};
 
 std::string MD5Helper::computeMD5(const char *data, size_t length)
 {

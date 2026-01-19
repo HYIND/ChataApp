@@ -2,6 +2,14 @@
 #include "FileTransferTask.h"
 #include "AsyncMD5.h"
 
+struct MD5CheckPoint
+{
+    uint32_t progress;
+    std::shared_ptr<MD5SnapShot> snap;
+
+    MD5CheckPoint();
+};
+
 class FileTransferDownLoadTask : public FileTransferTask
 {
 public:
@@ -43,8 +51,11 @@ protected:
 private:
 	bool ParseFile();
 	bool ReadChunkFile();
+    bool ReadMD5ChcekPointFile();
 	bool ParseChunkMap(const json& js);
-	bool WriteToChunkFile();
+    bool ParseMd5CheckPoint(const json &js);
+    bool WriteToChunkFile();
+    void WriteToMD5CheckFile();
     bool CheckTransFinish();
 
     void AsyncMD5Update();
@@ -59,6 +70,8 @@ protected:
 private:
 	bool IsChunkFileEnable = false;
 	FileIOHandler chunkfile_io;
+
 	bool IsRegister = false;
     AsyncMD5 _asyncmd5;
+    MD5CheckPoint _MD5CheckPoint;
 };
