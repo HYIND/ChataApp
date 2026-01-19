@@ -2,8 +2,8 @@
 #include "NetWorkHelper.h"
 #include "MD5Helper.h"
 
-FileTransferUploadTask::FileTransferUploadTask(const string &taskid, const string &filepath)
-    : FileTransferTask(taskid, filepath, "")
+FileTransferUploadTask::FileTransferUploadTask(const string &taskid, const string &filepath, const string &md5)
+    : FileTransferTask(taskid, filepath, md5)
 {
     ParseFile();
 }
@@ -52,7 +52,8 @@ bool FileTransferUploadTask::ParseFile()
     IsFileEnable = file_io.Open(file_path, FileIOHandler::OpenMode::READ_ONLY);
     if (IsFileEnable)
     {
-        _md5 = MD5Helper::computeFileMD5(file_path);
+        if (_md5.empty())
+            _md5 = MD5Helper::computeFileMD5(file_path);
         file_size = file_io.GetSize();
         suggest_chunksize = GetSuggestChunsize(file_size);
     }

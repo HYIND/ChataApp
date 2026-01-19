@@ -49,7 +49,7 @@ public:
 
 private:
     FileTransManager();
-    bool AddUploadTask(const string &fileid, const string &taskid, const string &filepath, BaseNetWorkSession *session);
+    bool AddUploadTask(const string &fileid, const string &taskid, const string &filepath, const string &md5, BaseNetWorkSession *session);
     bool AddDownloadTask(const string &fileid, const string &taskid, const string &filepath, const string &md5, uint64_t filesize, BaseNetWorkSession *session);
     void DeleteTask(const string &taskid);
     void CleanExpireTask();

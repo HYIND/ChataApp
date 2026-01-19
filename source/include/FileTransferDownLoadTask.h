@@ -1,5 +1,6 @@
 #pragma once
 #include "FileTransferTask.h"
+#include "AsyncMD5.h"
 
 class FileTransferDownLoadTask : public FileTransferTask
 {
@@ -46,6 +47,9 @@ private:
     bool WriteToChunkFile();
     bool CheckTransFinish();
 
+    void AsyncMD5Update();
+    std::string AsyncMD5Final();
+
 protected:
     std::function<void(FileTransferDownLoadTask *)> _callbackError;
     std::function<void(FileTransferDownLoadTask *)> _callbackFinieshed;
@@ -56,4 +60,5 @@ private:
     bool IsChunkFileEnable = false;
     FileIOHandler chunkfile_io;
     bool IsRegister = false;
+    AsyncMD5 _asyncmd5;
 };

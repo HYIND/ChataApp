@@ -5,7 +5,7 @@
 class FileTransferUploadTask : public FileTransferTask
 {
 public:
-    FileTransferUploadTask(const string &taskid, const string &filepath);
+    FileTransferUploadTask(const string &taskid, const string &filepath, const string &md5 = "");
     virtual ~FileTransferUploadTask();
 
 public:
