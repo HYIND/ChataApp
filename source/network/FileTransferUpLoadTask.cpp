@@ -337,10 +337,13 @@ void FileTransferUploadTask::OnProgress(uint32_t progress)
 
 bool FileTransferUploadTask::StartSendFile()
 {
-	if (IsFileEnable)
+    bool result = IsFileEnable;
+    if (result)
 		SendTransReq();
+    else
+        OccurError();
 
-	return IsFileEnable;
+    return result;
 }
 
 void FileTransferUploadTask::ProcessMsg(const json& js, Buffer& buf)

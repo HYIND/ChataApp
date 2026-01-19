@@ -182,12 +182,7 @@ bool FileTransManager::AddUploadTask(const QString& fileid, const QString& taski
 		SAFE_DELETE(content);
 
 	if (result)
-		result = uploadtask->StartSendFile();
-	if (!result)
-	{
-		m_tasks.Erase(taskid);
-		SAFE_DELETE(content);
-	}
+        result = uploadtask->StartSendFile(); // 如果返回false，task自动触发错误，无需额外处理
 
 	return result;
 }
