@@ -5,6 +5,7 @@ project(chat_qml_client VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 20)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick)
 
@@ -44,6 +45,8 @@ set(APP_SOURCES
     source/network/FileIOHandler.cpp
     source/network/CRC32Helper.cpp
     source/network/MD5Helper.cpp
+    source/network/AsyncMD5.cpp
+    source/network/ThreadPool.cpp
 )
 
 set(APP_INCLUDES
@@ -80,6 +83,8 @@ set(APP_INCLUDES
     source/network/SafeStl.h
     source/network/CRC32Helper.h
     source/network/MD5Helper.h
+    source/network/AsyncMD5.h
+    source/network/ThreadPool.h
 )
 
 qt_add_executable(appchat_qml_client

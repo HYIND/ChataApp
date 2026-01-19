@@ -6,7 +6,7 @@
 class FileTransferUploadTask : public FileTransferTask
 {
 public:
-	FileTransferUploadTask(const QString& taskid, const QString& filepath);
+    FileTransferUploadTask(const QString& taskid, const QString& filepath, const QString& md5 = "");
 	virtual ~FileTransferUploadTask();
 
 public:

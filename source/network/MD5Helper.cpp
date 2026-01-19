@@ -1,10 +1,9 @@
-
+#include "MD5Helper.h"
 #include <iostream>
 #include <iomanip>
 #include <cstring>
 #include <cstdlib>
 #include <sstream>
-#include "MD5Helper.h"
 #include "FileIOHandler.h"
 
 constexpr uint64_t MAX_CLIP_SIZE = 5 * 1024 * 1024;
@@ -189,6 +188,7 @@ std::string computeMD5String(const unsigned char *data, size_t length)
     computeMD5(data, length, hash);
     return toHexString(hash);
 }
+}
 
 struct MD5Context
 {
@@ -205,60 +205,6 @@ struct MD5Context
         count = 0;
     }
 };
-
-std::shared_ptr<MD5Context> MD5_Init()
-{
-    return std::make_shared<MD5Context>();
-}
-
-void MD5_Update(std::shared_ptr<MD5Context> ctx, const unsigned char *data, unsigned long long length)
-{
-    if (data && length > 0)
-    {
-        ctx->cacheBuffer.Seek(ctx->cacheBuffer.Length());
-        ctx->cacheBuffer.Write(data, length);
-        ctx->cacheBuffer.Seek(0);
-    }
-
-    while (ctx->cacheBuffer.Remain() >= MD5_BLOCK_SIZE)
-    {
-        processBlock(&(ctx->status[0]), &(ctx->status[1]), &(ctx->status[2]), &(ctx->status[3]),
-                     reinterpret_cast<const unsigned char *>(ctx->cacheBuffer.Byte() + ctx->cacheBuffer.Position()));
-        ctx->cacheBuffer.Seek(ctx->cacheBuffer.Position() + MD5_BLOCK_SIZE);
-        ctx->count += MD5_BLOCK_SIZE;
-    }
-    ctx->cacheBuffer.Shift(ctx->cacheBuffer.Position());
-    ctx->cacheBuffer.Seek(0);
-}
-
-std::string MD5_Final(std::shared_ptr<MD5Context> ctx)
-{
-    if (ctx->cacheBuffer.Length() >= 64)
-        MD5_Update(ctx, nullptr, 0);
-
-    ctx->count += ctx->cacheBuffer.Length();
-
-    unsigned long long lastMessageLength = ctx->cacheBuffer.Length();
-    unsigned long long paddingBlcokLength = 0;
-    if (MD5_BLOCK_SIZE - ctx->cacheBuffer.Length() >= 9)
-        paddingBlcokLength = MD5_BLOCK_SIZE;
-    else
-        paddingBlcokLength = 2 * MD5_BLOCK_SIZE;
-
-    ctx->cacheBuffer.ReSize(paddingBlcokLength);
-    char *ptr = ctx->cacheBuffer.Byte();
-    ptr[lastMessageLength] = 0x80;
-    unsigned long long paddingzerolen = paddingBlcokLength - (lastMessageLength + 1 + 8);
-    memset(ptr + (lastMessageLength + 1), 0, paddingzerolen);
-    unsigned long long bitLength = ctx->count * 8;
-    memcpy(ptr + (lastMessageLength + 1 + paddingzerolen), &bitLength, 8);
-    assert(paddingBlcokLength == MD5_BLOCK_SIZE || paddingBlcokLength == 2 * MD5_BLOCK_SIZE);
-
-    MD5_Update(ctx, nullptr, 0);
-
-    return toHexString(reinterpret_cast<unsigned char *>(ctx->status));
-}
-}
 
 std::string MD5Helper::computeMD5(const char *data, size_t length)
 {
@@ -282,21 +228,20 @@ std::string MD5Helper::computeMD5(const Buffer &buf)
 
 std::string MD5Helper::computeFileMD5(const std::string &filepath)
 {
-    auto ctx = MD5Calculate::MD5_Init();
+    auto ctx = MD5Ctx_Init();
 
     FileIOHandler handle(filepath, FileIOHandler::OpenMode::READ_ONLY);
-
     uint64_t totalsize = handle.GetSize();
-    while (totalsize > 0)
+    uint64_t remainsize = totalsize;
+    while (remainsize > 0)
     {
-        uint64_t readsize = min(totalsize, MAX_CLIP_SIZE);
+        uint64_t readsize = min(remainsize, MAX_CLIP_SIZE);
         Buffer buf;
         handle.Read(buf, readsize);
-        totalsize -= readsize;
-        MD5Calculate::MD5_Update(ctx, reinterpret_cast<const unsigned char *>(buf.Byte()), buf.Length());
+        MD5Ctx_Update(ctx, reinterpret_cast<const unsigned char *>(buf.Byte()), buf.Length());
+        remainsize -= readsize;
     }
-
-    return MD5Calculate::MD5_Final(ctx);
+    return MD5Ctx_Final(ctx);
 }
 
 bool MD5Helper::verifyMD5(const char *data, size_t length, const std::string &expectedMD5)
@@ -322,4 +267,56 @@ bool MD5Helper::verifyMD5(const Buffer &buf, const std::string &expectedMD5)
 bool MD5Helper::verifyFileMD5(const std::string &filepath, const std::string &expectedMD5)
 {
     return expectedMD5 == computeFileMD5(filepath);
+}
+
+std::shared_ptr<MD5Context> MD5Helper::MD5Ctx_Init()
+{
+    return std::make_shared<MD5Context>();
+}
+
+void MD5Helper::MD5Ctx_Update(std::shared_ptr<MD5Context> ctx, const unsigned char *data, unsigned long long length)
+{
+    if (data && length > 0)
+    {
+        ctx->cacheBuffer.Seek(ctx->cacheBuffer.Length());
+        ctx->cacheBuffer.Write(data, length);
+        ctx->cacheBuffer.Seek(0);
+    }
+    while (ctx->cacheBuffer.Remain() >= MD5Calculate::MD5_BLOCK_SIZE)
+    {
+        MD5Calculate::processBlock(&(ctx->status[0]), &(ctx->status[1]), &(ctx->status[2]), &(ctx->status[3]),
+                                   reinterpret_cast<const unsigned char *>(ctx->cacheBuffer.Byte() + ctx->cacheBuffer.Position()));
+        ctx->cacheBuffer.Seek(ctx->cacheBuffer.Position() + MD5Calculate::MD5_BLOCK_SIZE);
+        ctx->count += MD5Calculate::MD5_BLOCK_SIZE;
+    }
+    ctx->cacheBuffer.Shift(ctx->cacheBuffer.Position());
+    ctx->cacheBuffer.Seek(0);
+}
+
+std::string MD5Helper::MD5Ctx_Final(std::shared_ptr<MD5Context> ctx)
+{
+    if (ctx->cacheBuffer.Length() >= 64)
+        MD5Ctx_Update(ctx, nullptr, 0);
+
+    ctx->count += ctx->cacheBuffer.Length();
+
+    unsigned long long lastMessageLength = ctx->cacheBuffer.Length();
+    unsigned long long paddingBlcokLength = 0;
+    if (MD5Calculate::MD5_BLOCK_SIZE - ctx->cacheBuffer.Length() >= 9)
+        paddingBlcokLength = MD5Calculate::MD5_BLOCK_SIZE;
+    else
+        paddingBlcokLength = 2 * MD5Calculate::MD5_BLOCK_SIZE;
+
+    ctx->cacheBuffer.ReSize(paddingBlcokLength);
+    char *ptr = ctx->cacheBuffer.Byte();
+    ptr[lastMessageLength] = 0x80;
+    unsigned long long paddingzerolen = paddingBlcokLength - (lastMessageLength + 1 + 8);
+    memset(ptr + (lastMessageLength + 1), 0, paddingzerolen);
+    unsigned long long bitLength = ctx->count * 8;
+    memcpy(ptr + (lastMessageLength + 1 + paddingzerolen), &bitLength, 8);
+    assert(paddingBlcokLength == MD5Calculate::MD5_BLOCK_SIZE || paddingBlcokLength == 2 * MD5Calculate::MD5_BLOCK_SIZE);
+
+    MD5Ctx_Update(ctx, nullptr, 0);
+
+    return MD5Calculate::toHexString(reinterpret_cast<unsigned char *>(ctx->status));
 }

@@ -1,10 +1,9 @@
 #include "FileTransferUploadTask.h"
-#include "ConnectManager.h"
 #include "NetWorkHelper.h"
 #include "MD5Helper.h"
 
-FileTransferUploadTask::FileTransferUploadTask(const QString& taskid, const QString& filepath)
-    : FileTransferTask(taskid, filepath, "")
+FileTransferUploadTask::FileTransferUploadTask(const QString& taskid, const QString& filepath, const QString& md5)
+    : FileTransferTask(taskid, filepath, md5)
 {
 	ParseFile();
 }
@@ -46,7 +45,8 @@ bool FileTransferUploadTask::ParseFile()
 	IsFileEnable = file_io.Open(file_path, FileIOHandler::OpenMode::READ_ONLY);
 	if (IsFileEnable)
 	{
-        _md5 = QString::fromStdString(MD5Helper::computeFileMD5(file_path.toStdString()));
+        if(_md5.isEmpty())
+            _md5 = QString::fromStdString(MD5Helper::computeFileMD5(file_path.toStdString()));
 		file_size = file_io.GetSize();
 		suggest_chunksize = GetSuggestChunsize(file_size);
 	}

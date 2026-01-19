@@ -70,7 +70,7 @@ public:
 
 private:
 	FileTransManager();
-	bool AddUploadTask(const QString& fileid, const QString& taskid, const QString& filepath, uint64_t suggest_chunksize = 1000);
+    bool AddUploadTask(const QString& fileid, const QString& taskid, const QString& filepath, const QString& md5, uint64_t suggest_chunksize = 1000);
     bool AddDownloadTask(const QString& fileid, const QString& taskid, const QString& filepath, const QString& md5, uint64_t filesize);
 	void DeleteTask(const QString& taskid);
 	bool FindTaskByFileId(const QString& fileid, FileTransTaskContent*& content);

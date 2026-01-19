@@ -237,6 +237,47 @@ bool FileTransferDownLoadTask::CheckTransFinish()
 	return getUntransferredChunks(chunk_map, file_size).empty();
 }
 
+void FileTransferDownLoadTask::AsyncMD5Update()
+{
+    static constexpr uint64_t max_read_block_size = 5 * 1024 * 1024;
+    uint64_t hasuploadsize = _asyncmd5.Count();
+    for (auto &chunk : chunk_map)
+    {
+        if (hasuploadsize >= chunk.range_left && hasuploadsize <= chunk.range_right)
+        {
+            uint64_t readpostion = hasuploadsize;
+            uint64_t readsize = min((chunk.range_right + 1) - readpostion, max_read_block_size);
+            Buffer buf;
+            file_io.Seek(readpostion);
+            file_io.Read(buf, readsize);
+            _asyncmd5.Update(buf);
+            break;
+        }
+    }
+}
+
+std::string FileTransferDownLoadTask::AsyncMD5Final()
+{
+    static constexpr uint64_t max_read_block_size = 5 * 1024 * 1024;
+    uint64_t totalsize = file_io.GetSize();
+    uint64_t hasuploadsize = _asyncmd5.Count();
+    if (totalsize > hasuploadsize)
+    {
+        uint64_t remainsize = totalsize - hasuploadsize;
+        while (remainsize > 0)
+        {
+            uint64_t readpostion = totalsize - remainsize;
+            uint64_t readsize = min(remainsize, (uint64_t)max_read_block_size);
+            Buffer buf;
+            file_io.Seek(readpostion);
+            file_io.Read(buf, readsize);
+            _asyncmd5.UpdateSync(buf);
+            remainsize -= readsize;
+        }
+    }
+    return _asyncmd5.Final();
+}
+
 void FileTransferDownLoadTask::OccurError()
 {
 	if (!IsError)
@@ -436,6 +477,7 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
             chunk_map.emplace_back(0, chunkdata.range_left, chunkdata.range_right);
             chunk_map = mergeChunks(chunk_map);
 			// displayTransferProgress(file_size, chunk_map);
+            AsyncMD5Update();
         }
 	}
 	else
@@ -454,7 +496,7 @@ void FileTransferDownLoadTask::RecvChunkDataAndAck(const json& js, Buffer& buf)
 	if (finished)
 	{
 		file_io.Truncate(file_size);
-        if (!MD5Helper::verifyFileMD5(file_path.toStdString(), _md5.toStdString()))
+        if (_md5 != QString::fromStdString(AsyncMD5Final()))
         {
             OccurError();
             return;
@@ -516,7 +558,7 @@ void FileTransferDownLoadTask::AckRecvFinished(const json& js)
 
 	if (IsFinished)
 	{
-        if (!MD5Helper::verifyFileMD5(file_path.toStdString(), _md5.toStdString()))
+        if (_md5 != QString::fromStdString(AsyncMD5Final()))
             OccurError();
         else
         {

@@ -108,7 +108,7 @@ void FileTransManager::AckTaskRes(const json& js)
 				return;
 
 			//防止重复添加同一文件的任务
-			if (!AddUploadTask(fileid, taskid, re->filepath, suggest_chunksize))
+            if (!AddUploadTask(fileid, taskid, re->filepath, re->md5, suggest_chunksize))
 			{
 				json js_error;
 				js_error["command"] = 7080;
@@ -161,7 +161,7 @@ void FileTransManager::AckTaskRes(const json& js)
 	}
 }
 
-bool FileTransManager::AddUploadTask(const QString& fileid, const QString& taskid, const QString& filepath, uint64_t suggest_chunksize)
+bool FileTransManager::AddUploadTask(const QString& fileid, const QString& taskid, const QString& filepath, const QString& md5, uint64_t suggest_chunksize)
 {
 	FileTransTaskContent* content = nullptr;
 	if (FindTaskByFileId(fileid, content))
@@ -169,7 +169,7 @@ bool FileTransManager::AddUploadTask(const QString& fileid, const QString& taski
 	if (m_tasks.Find(taskid, content))
 		return false;
 
-	FileTransferUploadTask* uploadtask = new FileTransferUploadTask(taskid, filepath);
+    FileTransferUploadTask* uploadtask = new FileTransferUploadTask(taskid, filepath, md5);
 	uploadtask->BindErrorCallBack(std::bind(&FileTransManager::OnUploadError, this, std::placeholders::_1));
 	uploadtask->BindFinishedCallBack(std::bind(&FileTransManager::OnUploadFinish, this, std::placeholders::_1));
 	uploadtask->BindInterruptedCallBack(std::bind(&FileTransManager::OnUploadInterrupt, this, std::placeholders::_1));
