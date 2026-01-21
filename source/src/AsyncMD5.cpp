@@ -1,6 +1,6 @@
 #include "AsyncMD5.h"
 #include "MD5Helper.h"
-#include "ThreadPool.h"
+#include "FlexThreadPool.h"
 
 class AsyncMD5Handle : public std::enable_shared_from_this<AsyncMD5Handle>
 {
@@ -27,7 +27,7 @@ public:
 
 private:
     static CriticalSectionLock _execpoolmutex;
-    static ThreadPool _execpool;
+    static FlexThreadPool _execpool;
 
     void Need();
 
@@ -47,7 +47,7 @@ private:
 };
 
 CriticalSectionLock AsyncMD5Handle::_execpoolmutex = CriticalSectionLock();
-ThreadPool AsyncMD5Handle::_execpool = ThreadPool(2);
+FlexThreadPool AsyncMD5Handle::_execpool = FlexThreadPool(8);
 
 MD5SnapShot::MD5SnapShot()
 {
