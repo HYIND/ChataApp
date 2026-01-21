@@ -47,6 +47,7 @@ set(APP_SOURCES
     source/network/MD5Helper.cpp
     source/network/AsyncMD5.cpp
     source/network/ThreadPool.cpp
+    source/network/FlexThreadPool.cpp
 )
 
 set(APP_INCLUDES
@@ -85,6 +86,7 @@ set(APP_INCLUDES
     source/network/MD5Helper.h
     source/network/AsyncMD5.h
     source/network/ThreadPool.h
+    source/network/FlexThreadPool.h
 )
 
 qt_add_executable(appchat_qml_client

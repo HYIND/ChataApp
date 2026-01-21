@@ -125,6 +125,7 @@ void OCRProcess::addOCRTask(std::shared_ptr<OCRTask> task)
     if(!task)
         return;
     m_tasks.enqueue(task);
+    LockGuard guard(m_looplock);
     m_loopcv.NotifyOne();
 }
 
@@ -132,8 +133,8 @@ void OCRProcess::processLoop()
 {
     while(!m_stoploop)
     {
-        m_looplock.Enter();
-        m_loopcv.WaitFor(m_looplock,std::chrono::milliseconds(100));
+        LockGuard guard(m_looplock);
+        m_loopcv.WaitFor(guard,std::chrono::milliseconds(100));
 
         if(m_stoploop)
             break;
