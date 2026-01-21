@@ -56,6 +56,7 @@ private:
 private:
     std::unordered_map<std::string, std::shared_mutex> _fileMutexes;
     bool enable = true;
+    std::shared_ptr<TimerTask> CleanExpiredTask;
 };
 
 #define MESSAGERECORDSTORE MessageRecordStore::Instance()

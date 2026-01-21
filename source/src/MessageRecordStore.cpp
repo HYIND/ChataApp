@@ -170,8 +170,8 @@ MessageRecordStore::MessageRecordStore()
 {
     FileIOHandler::CreateFolder(GetMessageRecordDirName());
     static constexpr uint64_t cleaninterval = 30 * 1000, firstclean = 10 * 1000;
-    auto task = TimerTask::CreateRepeat("CleanExpiredMsgTimer", cleaninterval, std::bind(&MessageRecordStore::CleanExpiredMsg, this), firstclean);
-    task->Run();
+    CleanExpiredTask = TimerTask::CreateRepeat("CleanExpiredMsgTimer", cleaninterval, std::bind(&MessageRecordStore::CleanExpiredMsg, this), firstclean);
+    CleanExpiredTask->Run();
 }
 
 bool MessageRecordStore::StoreMsg(const MsgRecord &msg)

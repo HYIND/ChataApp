@@ -42,7 +42,7 @@ int main()
     NetWorkSessionListener listener(SessionType::CustomTCPSession);
     listener.BindSessionEstablishCallBack(std::bind(&ConnectManager::callBackSessionEstablish, &ConnectHost, std::placeholders::_1));
 
-    std::string IP = "192.168.58.128";
+    std::string IP = "192.168.58.130";
     int port = 8888;
     if (!listener.Listen(IP, port))
     // if (!listener.Listen("127.0.0.1", 8888))

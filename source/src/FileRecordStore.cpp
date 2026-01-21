@@ -62,8 +62,8 @@ FileRecordStore::FileRecordStore()
     filePath_ = ConcatPath(GetFileRecordDirName(), "FileRecord");
     loadRecords();
     static constexpr uint64_t cleaninterval = 30 * 1000, firstclean = 10 * 1000;
-    auto task = TimerTask::CreateRepeat("CleanExpiredFileStoreTimer", cleaninterval, std::bind(&FileRecordStore::CleanExpiredFileStore, this), firstclean);
-    task->Run();
+    CleanExpiredTask = TimerTask::CreateRepeat("CleanExpiredFileStoreTimer", cleaninterval, std::bind(&FileRecordStore::CleanExpiredFileStore, this), firstclean);
+    CleanExpiredTask->Run();
 }
 
 bool FileRecordStore::addFileRecord(std::string fileId,

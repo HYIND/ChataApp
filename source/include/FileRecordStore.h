@@ -68,6 +68,7 @@ private:
     std::string filePath_;
     SafeMap<std::string, FileRecord *> records_;
     CriticalSectionLock _lock;
+    std::shared_ptr<TimerTask> CleanExpiredTask;
 };
 
 #define FILERECORDSTORE FileRecordStore::Instance()
