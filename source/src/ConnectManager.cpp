@@ -1,6 +1,24 @@
 #include "ConnectManager.h"
 #include "FileTransManager.h"
 
+ConnectManager::ConnectManager()
+{
+    listener = std::make_unique<NetWorkSessionListener>(SessionType::CustomTCPSession);
+    listener->BindSessionEstablishCallBack(std::bind(&ConnectManager::callBackSessionEstablish, this, std::placeholders::_1));
+}
+
+bool ConnectManager::Start(const std::string &IP, int Port)
+{
+    ip = IP;
+    port = Port;
+    if (!listener->Listen(IP, port))
+    {
+        perror("listen error !");
+        return false;
+    }
+    return true;
+}
+
 void ConnectManager::callBackSessionEstablish(BaseNetWorkSession *session)
 {
     session->BindRecvDataCallBack(std::bind(&ConnectManager::callBackRecvMessage, this, std::placeholders::_1, std::placeholders::_2));

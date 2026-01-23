@@ -39,17 +39,10 @@ int main()
     // 文件传输系统注入用户管理，用以校验用户请求
     FILETRANSMANAGER->SetLoginUserManager(&LoginUserHost);
 
-    NetWorkSessionListener listener(SessionType::CustomTCPSession);
-    listener.BindSessionEstablishCallBack(std::bind(&ConnectManager::callBackSessionEstablish, &ConnectHost, std::placeholders::_1));
-
     std::string IP = "192.168.58.130";
     int port = 8888;
-    if (!listener.Listen(IP, port))
-    // if (!listener.Listen("127.0.0.1", 8888))
-    {
-        perror("listen error !");
+    if (!ConnectHost.Start(IP, port))
         return -1;
-    }
 
     RunNetCoreLoop(true);
 }
