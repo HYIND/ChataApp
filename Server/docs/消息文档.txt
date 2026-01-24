@@ -1,0 +1,196 @@
+客户端和服务器消息的交互，遵循以下json格式：
+{
+  "command": number
+}
+
+1、登录:
+{
+    "command":1000,
+    "name":string
+}
+返回:
+{
+    "command":2000,
+    token:string,
+    name:string,
+    ip:string,
+    port:number
+}
+
+2、拉取在线用户:
+{
+    "command": 1001
+    "token":string
+}
+返回：
+{
+    "command": 2001,
+    users:[
+        {
+            token:string,
+            name:string,
+            ip:string,
+            port:number
+        },
+        {
+            token:string,
+            name:string,
+            ip:string,
+            port:number
+        },
+        ......
+    ]
+}
+
+3、客户端请求发送消息:
+{
+    "command": 1002,
+    "token":"string",
+    "goaltoken":"string",
+    "type":number
+    "msg":string
+
+    可选，如果是文件消息
+    "filename": string,
+    "filesize": number,
+    "md5": string,
+    "fileid": string
+}
+返回
+{
+    "command": 2002,
+    "result":bool
+}
+
+4、服务器分发用户发送的消息：
+{
+    "command":2003,
+    "srctoken":string,
+    "goaltoken":string,
+    "name":string,
+    "time":number
+    "ip":string,
+    "port":number,
+    "type":number
+    "msg":string
+
+    可选，如果是文件消息
+    "filename": string,
+    "filesize": number,
+    "md5": string,
+    "fileid": string
+}
+
+5、文件传输部分:
+5.1客户端发起上传/下载的初始化请求:
+{
+    "command": 4001
+    "fileid": string,
+    "taskid":string,
+    "type":number,
+    "token": string
+}
+5.2服务器返回文件元信息:
+{
+    "command": 5001
+    "fileid": string,
+    "type":number,
+    "result": number, //指示文件状态，如不可用、可用、不存在等
+    "filesize":number,
+    "suggest_chunksize": number, //建议分片大小
+    "taskid": string
+}
+5.3文件传输逻辑
+5.3.1发送端发送文件元数据，以及发起传输
+{
+    "command": 7000
+    "taskid": string,
+    "filename":string,
+    "filesize":number,
+}
+5.3.2接收端确认传输请求，并返回已接收过的分片数据
+{
+    "command": 8000
+    "taskid": string,
+    "result": number,
+    "filesize":number,
+    "suggest_chunksize": number, //建议分片大小
+    "chunk_map": [    // 服务端已有分片
+    {"index": 0, range:[0-500]},
+    {"index": 1, range:[500-1000]}
+  ]
+}
+5.3.3发送端上传分片:
+{
+    "command": 7001
+    "taskid": string,
+    "chunk_size":number,
+    "range":[2000,3000],
+    "data":bytes
+}
+5.3.4接收端确认分片
+{
+    "command": 8001
+    "taskid": string,
+    "chunk_size":number,
+    "range":[2000,3000],
+    "result":number
+    "chunk_map": [    // 接收端已有分片
+    {"index": 0, range:[0-500]},
+    {"index": 1, range:[500-1000]}
+  ]
+}
+5.3.5发送端完成传输
+{
+    "command": 7010
+    "taskid": string,
+    "result":number
+}
+5.3.6接收端确认完成传输
+{
+    "command": 8010
+    "taskid": string,
+    "result":number
+}
+5.3.7中断/暂停传输
+{
+    "command":7070
+    "taskid":string,
+    "result":number
+}
+5.3.8对端错误PeerError
+{
+    "command":7080
+    "taskid":string,
+    "result":number
+}
+
+6.拉取聊天记录
+{
+    "command":1003
+    "token":string,
+    "goaltoken":string,
+}
+返回：
+{
+    "command":2004,
+    "messages":
+    [
+        {
+        "srctoken":string,
+        "goaltoken":string,
+        "name":string,
+        "time":number
+        "ip":string,
+        "port":number,
+        "type":number
+        "msg":string
+
+        可选，如果是文件消息
+        "filename": string,
+        "filesize": number,
+        "md5": string,
+        "fileid": string
+        }......
+    ]
+}
