@@ -78,7 +78,7 @@ public:
 
             while (true)
             {
-                auto status = fut.wait_for(std::chrono::milliseconds(100));
+                auto status = fut.wait_for(std::chrono::milliseconds(10));
                 if (status == std::future_status::ready)
                 {
                     try
